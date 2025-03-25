@@ -1,150 +1,219 @@
-Parfait ! Voici un **README.md complet et prêt pour GitHub** pour ton projet **Datalyzer**, avec :
+# EDA Explorer – FastAPI + Streamlit + Docker
 
-- Description claire du projet  
-- Instructions d’installation  
-- Exemple d’appel à l’API via Swagger  
-- Informations pour les tests  
-- Capture d’une structure professionnelle
+Ce projet vous permet de faire une **analyse exploratoire de données (EDA)** sur n'importe quel fichier CSV, avec une interface interactive **Streamlit** et une API **FastAPI**.
 
 ---
 
-### ✅ `README.md`
+## Fonctionnalités
 
-```markdown
-# 📊 Datalyzer
-
-**Datalyzer** est une API locale (FastAPI) permettant d'explorer rapidement un jeu de données tabulaire (CSV) grâce à des analyses EDA automatisées (statistiques + visualisations).
-
-Développé pour les data scientists, analystes ou tout curieux de la donnée souhaitant obtenir des insights en quelques secondes — sans lancer un notebook.
-
----
-
-## 🚀 Fonctionnalités
-
-- Aperçu général du dataset (shape, types, NA, cardinalités)
-- Statistiques descriptives des variables numériques
-- Distributions et boxplots en image
-- Matrice de corrélation (heatmap)
-- Analyse des colonnes catégorielles
-- Graphiques encodés en **base64** pour exploitation web/API
-- Interface interactive via Swagger UI
+- Upload de fichier CSV
+- Aperçu des données (`head`)
+- Valeurs manquantes (nombre + pourcentage)
+- Statistiques descriptives (`describe`)
+- Détection et suppression des doublons
+- Suppression de colonnes
+- Génération d’un rapport CSV téléchargeable
+- Export du dataset nettoyé
+- Graphiques interactifs avec Plotly (via Streamlit)
+- Architecture Docker avec `docker-compose`
 
 ---
 
-## 🧱 Structure du projet
+## Structure du projet
 
 ```
-datalyzer/
-├── app/
-│   ├── main.py              # API FastAPI
-│   └── eda_utils.py         # Fonctions d'analyse exploratoire
-├── data/                    # (ex : fichiers de test comme spotify_2023.csv)
-├── tests/
-│   └── test_api.py          # (à venir)
-├── requirements.txt         # Dépendances
-├── .gitignore
+eda_explorer/
+├── api/                    ← Backend FastAPI
+│   ├── main.py
+│   ├── test_api.py
+│   └── requirements.txt
+│
+├── streamlit_app/          ← Interface utilisateur
+│   ├── app.py
+│   └── requirements.txt
+│
+├── data/uploads/           ← Dossiers pour fichiers CSV
+│   └── test_sample.csv
+│
+├── Dockerfile.fastapi
+├── Dockerfile.streamlit
+├── docker-compose.yml
+├── .dockerignore
 └── README.md
 ```
 
 ---
 
-## ⚙️ Installation
+## Lancement de l'application (Docker Compose)
 
 ```bash
-git clone https://github.com/votre-nom/datalyzer.git
-cd datalyzer
-
-# Créer et activer l’environnement virtuel
-python -m venv .venv
-source .venv/bin/activate  # ou .venv\Scripts\activate sous Windows
-
-# Installer les dépendances
-pip install -r requirements.txt
+docker-compose up --build
 ```
+
+- **Streamlit** : http://localhost:8501  
+- **API FastAPI (Swagger UI)** : http://localhost:8000/docs
 
 ---
 
-## ▶️ Lancer l’API localement
+## Utilisation des tests API et UI
+
+Un jeu de données est déjà présent : `data/uploads/test_sample.csv`.
+
+### Pour tester l'API automatiquement :
 
 ```bash
-uvicorn app.main:app --reload
-```
-
-Puis accéder à l’interface :
-👉 [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-
----
-
-## 📂 Tester avec un fichier CSV
-
-Utilisez un fichier comme `spotify_2023.csv` dans l'interface Swagger :  
-- Ouvrez `/eda/`  
-- Cliquez sur **"Try it out"**  
-- Chargez le fichier  
-- Cliquez sur **"Execute"**
-
-L’API retournera :
-- Des statistiques au format JSON
-- Des visualisations encodées (images en base64)
-
----
-
-## ✅ Exemple de réponse (extrait)
-
-```json
-{
-  "overview": {
-    "shape": [100, 5],
-    "column_names": ["name", "age", "city", "income", ...]
-  },
-  "numeric_stats": {
-    "age": {
-      "mean": 35.6,
-      "std": 5.2,
-      "skew": 0.12
-    },
-    ...
-  },
-  "correlation_matrix_base64": "<image_base64>",
-  ...
-}
+docker exec -it <nom_du_conteneur_fastapi> bash
+python tests/test_api.py
 ```
 
 ---
 
-## 📦 Dépendances
+## API – Endpoints disponibles
 
-- [FastAPI](https://fastapi.tiangolo.com/)
-- [Uvicorn](https://www.uvicorn.org/)
-- [Pandas](https://pandas.pydata.org/)
-- [Matplotlib](https://matplotlib.org/)
-- [Seaborn](https://seaborn.pydata.org/)
-- [SciPy](https://scipy.org/)
-
----
-
-## 🛠️ À venir
-
-- Téléchargement de rapport HTML
-- Analyse par rapport à une variable cible
-- Endpoint `/analyze-target`
-- Tests automatisés (`pytest`)
+| Méthode | Endpoint             | Description |
+|---------|----------------------|-------------|
+| POST    | /upload/             | Upload CSV |
+| GET     | /head?n=5            | Aperçu du DataFrame |
+| GET     | /missing-values/     | Valeurs manquantes |
+| GET     | /describe/           | Stats descriptives |
+| GET     | /duplicates/         | Infos sur doublons |
+| POST    | /drop-duplicates/    | Supprimer doublons |
+| POST    | /drop-columns/       | Supprimer colonnes |
+| GET     | /export/             | Télécharger CSV nettoyé |
+| GET     | /report/             | Rapport descriptif CSV |
 
 ---
 
-## 👨‍💻 Auteur
+## Auteur
 
-**Ludovic Marchetti**  
-📧 contact@datahootcome.fr  
-🔗 [GitHub](https://github.com/ton-profil)
+Projet généré automatiquement avec l’assistance de ChatGPT et Dockerisé pour un usage local ou cloud-ready.
+
 
 ---
 
-## 🪪 Licence
+## Tests Streamlit (UI)
 
-Projet open-source sous licence MIT
+Un test E2E est fourni avec Playwright.
+
+### Installation des dépendances :
+
+```bash
+pip install -r tests/requirements-tests.txt
+playwright install
 ```
 
+### Exécution du test :
+
+```bash
+pytest tests/test_streamlit.py
+```
+
+Assurez-vous que l'interface Streamlit est en cours d'exécution à l'adresse : http://localhost:8501
+
+
 ---
 
-Souhaites-tu que je te prépare aussi le fichier `test_api.py` pour tester automatiquement l'API avec le fichier `spotify_2023.csv` ?
+## Fonctionnalités avancées EDA (dans Streamlit)
+
+- 🔍 **Détection automatique des types de variables** (numérique, catégorielle, binaire)
+- 📊 **Heatmap de corrélation** entre variables numériques
+- 🚨 **Détection des outliers** (méthode IQR)
+- 🧹 **Suggestions de nettoyage** :
+  - Colonnes constantes
+  - Faible variance
+- 🔄 **Encodage des colonnes catégorielles** (OneHot ou Ordinal)
+
+Accessible directement via l'interface Streamlit.
+
+
+---
+
+## Blocs EDA avancés disponibles dans l'interface
+
+Chaque bloc est indépendant et facultatif :
+
+- **🔍 Types de variables** : détecte automatiquement les colonnes numériques, catégorielles, binaires.
+- **📊 Corrélation** : affiche une heatmap interactive entre les variables numériques.
+- **🚨 Outliers (IQR)** : détecte et affiche les lignes extrêmes pour une variable numérique.
+- **🧹 Suggestions nettoyage** :
+  - Colonnes constantes
+  - Faible variance
+  - Valeurs manquantes
+- **🔄 Encodage** : One-Hot ou Ordinal sur les variables sélectionnées.
+
+Accessible directement dans l'app Streamlit (avec `st.expander()`).
+
+
+---
+
+## 📈 Visualisations interactives
+
+- Histogrammes, boxplots, nuages de points
+- Sélection dynamique des axes et des couleurs
+- Affichage via **Plotly Express** intégré à l'interface Streamlit
+
+
+---
+
+## 📊 Graphiques exploratoires métiers
+
+Inspirés du notebook original :
+
+- Moyenne de consommation par type de bâtiment
+- Moyenne d’émissions GES par type de bâtiment
+- Distribution de la consommation énergétique
+- Corrélation avec la consommation d'énergie
+
+Accessibles dans la section `📊 Graphiques exploratoires métiers` de l'app Streamlit.
+
+
+---
+
+## 🎯 Sélection des variables cibles
+
+Vous pouvez désormais choisir :
+- Une **variable cible principale** (ex : consommation d'énergie)
+- Une **variable secondaire** (ex : émissions GES)
+
+Ces choix sont utilisés automatiquement dans :
+- Les graphiques métiers
+- Les corrélations
+- Les analyses avancées
+
+---
+
+## ℹ️ Aides contextuelles intégrées
+
+Chaque bloc de l'application contient désormais des **explications claires** :
+- Ce qu’il fait
+- Ce qu’il attend
+- Comment interpréter les résultats
+
+Idéal pour les utilisateurs non techniques.
+
+
+---
+
+## 🎨 Graphiques interactifs ajoutés
+
+- 📦 **Boxplot interactif** : dispersion par catégorie
+- 🧮 **Scatter plot** : relation entre deux variables numériques avec couleur
+- 🔀 **Graphique croisé** : moyenne d’une variable cible selon deux catégories
+- ✅ Les anciens graphiques métiers utilisent maintenant une **variable catégorielle sélectionnable**, pas `building_type`
+
+
+
+---
+
+## 📄 Rapport HTML automatique
+
+- Généré via `ydata-profiling` (anciennement pandas-profiling)
+- Contient les statistiques descriptives, distributions, corrélations, alertes, etc.
+- Téléchargeable depuis l’interface
+
+---
+
+## 💾 Sauvegarde finale avec logs
+
+- Le DataFrame transformé est sauvegardé au format `.parquet` dans `data/exports/`
+- Un fichier `logs/eda_transformations.log` enregistre les opérations réalisées (nettoyage, encodage, etc.)

@@ -1,0 +1,23 @@
+FROM python:3.10-slim
+
+# Crée le dossier de travail
+WORKDIR /app
+
+# Copie les dépendances d'abord (optimisation du cache Docker)
+COPY api/requirements.txt .
+
+# Installe les dépendances avec pip
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copie le code de l’API
+COPY api /app
+
+# Crée le dossier de données (sécurisé)
+RUN mkdir -p /app/data/uploads
+
+# Expose le port d’API
+EXPOSE 8000
+
+# Commande de démarrage
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

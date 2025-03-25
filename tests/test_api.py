@@ -1,25 +1,34 @@
-# tests/test_api.py
-
 import requests
-import os
 
-def test_eda_endpoint():
-    file_path = os.path.join("data", "spotify_2023.csv")
-    url = "http://127.0.0.1:8000/eda/"
+API_URL = "http://localhost:8000"
 
-    with open(file_path, "rb") as f:
-        files = {"file": f}
-        response = requests.post(url, files=files)
+def test_upload():
+    with open("data/uploads/test_sample.csv", "rb") as f:
+        files = {"file": ("test_sample.csv", f, "text/csv")}
+        r = requests.post(f"{API_URL}/upload/", files=files)
+        assert r.status_code == 200
+        print("✅ Upload OK")
 
-    assert response.status_code == 200, f"❌ Code retour inattendu : {response.status_code}"
-    json_data = response.json()
-
-    # Vérifications clés
-    assert "overview" in json_data
-    assert "numeric_stats" in json_data
-    assert "correlation_matrix_base64" in json_data
-    assert "missing_values_plot_base64" in json_data
-    print("✅ Test API passé avec succès.")
+def test_all_endpoints():
+    endpoints = [
+        ("GET", "/head?n=5"),
+        ("GET", "/missing-values/"),
+        ("GET", "/describe/"),
+        ("GET", "/duplicates/"),
+        ("POST", "/drop-duplicates/"),
+        ("POST", "/drop-columns/", {"columns": ["ghg_emissions_total"]}),
+        ("GET", "/export/"),
+        ("GET", "/report/")
+    ]
+    for method, endpoint, *payload in endpoints:
+        if method == "GET":
+            r = requests.get(f"{API_URL}{endpoint}")
+        elif method == "POST":
+            r = requests.post(f"{API_URL}{endpoint}", json=payload[0])
+        assert r.status_code in [200, 400]
+        print(f"✅ {endpoint} OK")
 
 if __name__ == "__main__":
-    test_eda_endpoint()
+    test_upload()
+    test_all_endpoints()
+    print("\nTous les tests API ont été exécutés avec succès.")

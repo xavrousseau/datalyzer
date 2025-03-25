@@ -1,0 +1,23 @@
+FROM python:3.10-slim
+
+# Répertoire de travail dans le conteneur
+WORKDIR /app
+
+# Copie des dépendances en premier pour profiter du cache Docker
+COPY streamlit_app/requirements.txt .
+
+# Installation des dépendances Python
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copie du code source Streamlit
+COPY streamlit_app /app
+
+# Création du dossier de données (si non présent au build)
+RUN mkdir -p /app/data/uploads /app/data/exports
+
+# Port exposé pour Streamlit
+EXPOSE 8501
+
+# Commande de démarrage
+CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
