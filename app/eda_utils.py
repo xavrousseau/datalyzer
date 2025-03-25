@@ -1,130 +1,93 @@
-# app/eda_utils.py
-
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-import io
-import base64
-from scipy.stats import skew
+import plotly.express as px
+import plotly.graph_objects as go
+from io import StringIO
+from typing import Optional
 
-sns.set(style="whitegrid")
-
-# =========================================================
-# OUTIL DE CONVERSION FIGURE ➜ base64 pour l'API
-# =========================================================
-
-def fig_to_base64(fig):
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight")
-    buf.seek(0)
-    img_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
-    plt.close(fig)
-    return img_base64
+app = FastAPI()
 
 # =========================================================
 # 1. APERÇU GLOBAL
 # =========================================================
 
-def overview_report(df: pd.DataFrame) -> dict:
-    return {
+@app.get("/overview", response_class=HTMLResponse)
+async def overview(df: pd.DataFrame):
+    overview_data = {
         "shape": df.shape,
         "column_names": df.columns.tolist(),
         "data_types": df.dtypes.astype(str).to_dict(),
         "missing_values": df.isnull().sum().to_dict(),
         "n_unique": df.nunique().to_dict()
     }
-
-def print_overview(df: pd.DataFrame) -> None:
-    print(">> Dimensions :", df.shape)
-    print(">> Colonnes :", df.columns.tolist())
-    print("\n>> Types de données :\n", df.dtypes)
-    print("\n>> Nombre de valeurs uniques :\n", df.nunique())
-    print("\n>> Valeurs manquantes (par %):\n", df.isnull().mean().sort_values(ascending=False) * 100)
+    return overview_data
 
 # =========================================================
 # 2. VALEURS MANQUANTES
 # =========================================================
 
-def plot_missing_values(df: pd.DataFrame, threshold: float = 0.0) -> str | None:
+@app.get("/missing_values", response_class=HTMLResponse)
+async def missing_values(df: pd.DataFrame, threshold: float = 0.0):
     missing_pct = df.isnull().mean() * 100
     filtered = missing_pct[missing_pct > threshold].sort_values(ascending=False)
 
     if filtered.empty:
-        return None
+        raise HTTPException(status_code=404, detail="Aucune valeur manquante au-dessus du seuil.")
 
-    fig, ax = plt.subplots(figsize=(10, 5))
-    sns.barplot(x=filtered.index, y=filtered.values, ax=ax)
-    ax.set_ylabel("% de valeurs manquantes")
-    ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
-    ax.set_title("Taux de valeurs manquantes")
-    return fig_to_base64(fig)
+    fig = px.bar(filtered, x=filtered.index, y=filtered.values, labels={"x": "Colonnes", "y": "% de valeurs manquantes"})
+    fig.update_layout(title="Taux de valeurs manquantes", xaxis_tickangle=-45)
+    return fig.to_html()
 
 # =========================================================
 # 3. VARIABLES NUMÉRIQUES
 # =========================================================
 
-def analyze_numeric_features(df: pd.DataFrame) -> pd.DataFrame:
-    numeric_cols = df.select_dtypes(include=["float64", "int64"]).columns
-    stats = df[numeric_cols].describe().T
-    stats["skew"] = df[numeric_cols].apply(skew)
-    return stats
-
-def plot_numeric_distributions(df: pd.DataFrame) -> dict:
-    results = {}
-    numeric_cols = df.select_dtypes(include=["float64", "int64"]).columns
+@app.get("/numeric_distributions", response_class=HTMLResponse)
+async def numeric_distributions(df: pd.DataFrame):
+    numeric_cols = df.select_dtypes(include=["number"]).columns
+    plots = {}
     for col in numeric_cols:
-        fig, ax = plt.subplots()
-        sns.histplot(df[col].dropna(), kde=True, ax=ax)
-        ax.set_title(f"Distribution : {col}")
-        results[col] = fig_to_base64(fig)
-    return results
+        fig = px.histogram(df, x=col, title=f"Distribution : {col}")
+        plots[col] = fig.to_html()
+    return "<br>".join(plots.values())
 
-def plot_boxplots(df: pd.DataFrame) -> dict:
-    results = {}
-    numeric_cols = df.select_dtypes(include=["float64", "int64"]).columns
+@app.get("/boxplots", response_class=HTMLResponse)
+async def boxplots(df: pd.DataFrame):
+    numeric_cols = df.select_dtypes(include=["number"]).columns
+    plots = {}
     for col in numeric_cols:
-        fig, ax = plt.subplots()
-        sns.boxplot(x=df[col], ax=ax, orient='h')
-        ax.set_title(f"Boxplot : {col}")
-        results[col] = fig_to_base64(fig)
-    return results
+        fig = px.box(df, y=col, title=f"Boxplot : {col}")
+        plots[col] = fig.to_html()
+    return "<br>".join(plots.values())
 
 # =========================================================
 # 4. VARIABLES CATÉGORIELLES
 # =========================================================
 
-def analyze_categorical_features(df: pd.DataFrame, max_unique=20) -> dict:
+@app.get("/categorical_distributions", response_class=HTMLResponse)
+async def categorical_distributions(df: pd.DataFrame, max_unique: int = 20):
     cat_cols = df.select_dtypes(include=['object', 'category']).columns
-    result = {}
+    plots = {}
     for col in cat_cols:
         if df[col].nunique() <= max_unique:
-            result[col] = df[col].value_counts(normalize=True).to_dict()
-    return result
-
-def plot_categorical_distributions(df: pd.DataFrame, max_unique=20) -> dict:
-    results = {}
-    cat_cols = df.select_dtypes(include=['object', 'category']).columns
-    for col in cat_cols:
-        if df[col].nunique() <= max_unique:
-            fig, ax = plt.subplots()
-            sns.countplot(y=df[col], order=df[col].value_counts().index, ax=ax)
-            ax.set_title(f"Répartition : {col}")
-            results[col] = fig_to_base64(fig)
-    return results
+            fig = px.bar(df[col].value_counts(), title=f"Répartition : {col}")
+            plots[col] = fig.to_html()
+    return "<br>".join(plots.values())
 
 # =========================================================
 # 5. CORRÉLATION
 # =========================================================
 
-def plot_correlation_matrix(df: pd.DataFrame, method='pearson') -> str:
+@app.get("/correlation_matrix", response_class=HTMLResponse)
+async def correlation_matrix(df: pd.DataFrame, method: str = 'pearson'):
     corr = df.corr(method=method)
-    fig, ax = plt.subplots(figsize=(12, 8))
-    sns.heatmap(corr, annot=True, cmap='coolwarm', fmt=".2f", ax=ax)
-    ax.set_title("Matrice de corrélation")
-    return fig_to_base64(fig)
+    fig = px.imshow(corr, text_auto=True, title="Matrice de corrélation")
+    return fig.to_html()
 
-def get_highly_correlated_features(df: pd.DataFrame, threshold=0.8) -> list:
+@app.get("/highly_correlated_features", response_class=HTMLResponse)
+async def highly_correlated_features(df: pd.DataFrame, threshold: float = 0.8):
     corr_matrix = df.corr().abs()
     upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
     result = [
@@ -138,15 +101,34 @@ def get_highly_correlated_features(df: pd.DataFrame, threshold=0.8) -> list:
 # 6. RELATION AVEC LA CIBLE
 # =========================================================
 
-def analyze_target_relationships(df: pd.DataFrame, target: str) -> dict:
+@app.get("/target_relationships", response_class=HTMLResponse)
+async def target_relationships(df: pd.DataFrame, target: str):
     if target not in df.columns:
-        return {}
+        raise HTTPException(status_code=404, detail=f"La cible '{target}' n'est pas dans le DataFrame.")
 
-    figs = {}
     num_cols = df.select_dtypes(include=['float64', 'int64']).columns.drop(target, errors='ignore')
+    plots = {}
     for col in num_cols:
-        fig, ax = plt.subplots()
-        sns.boxplot(x=df[target], y=df[col], ax=ax)
-        ax.set_title(f"{col} en fonction de {target}")
-        figs[col] = fig_to_base64(fig)
-    return figs
+        fig = px.box(df, x=target, y=col, title=f"{col} en fonction de {target}")
+        plots[col] = fig.to_html()
+    return "<br>".join(plots.values())
+
+# =========================================================
+# CHARGEMENT DU DATAFRAME (EXEMPLE)
+# =========================================================
+
+def load_data():
+    # Exemple de chargement de données
+    data = {
+        "age": [25, 30, 35, 40, 45],
+        "salary": [50000, 60000, 70000, 80000, 90000],
+        "department": ["HR", "IT", "IT", "HR", "Finance"],
+        "target": [0, 1, 0, 1, 0]
+    }
+    return pd.DataFrame(data)
+
+# Route pour tester l'API
+@app.get("/test")
+async def test():
+    df = load_data()
+    return await overview(df)
