@@ -45,7 +45,7 @@ from log_utils import log_transformation
 
 # Récupère l'URL de l'API backend depuis une variable d'environnement (utile en déploiement)
 # Si la variable n'est pas définie, on utilise "http://fastapi:8000" par défaut.
-API_URL = os.getenv("API_URL", "http://fastapi:8000")
+API_URL = os.getenv("API_URL", "http://fastapi:8500")
 
 
 # =============================================================================
@@ -270,11 +270,29 @@ if df is not None:
     # -------------------------------------------
     with st.expander("🔀 Graphique croisé (moyenne cible)", expanded=False):
         st.info("Analyse croisée par deux variables catégorielles.")
-        # Sélection de deux variables catégorielles pour analyser la moyenne de la cible principale
+
+        # Sélection de deux variables catégorielles
         cat1 = st.selectbox("Catégorie X", cat_cols, key="group1")
         cat2 = st.selectbox("Catégorie couleur", cat_cols, key="group2")
-        agg_df = df.groupby([cat1, cat2])[target_1].mean().reset_index()
-        st.plotly_chart(px.bar(agg_df, x=cat1, y=target_1, color=cat2, barmode="group"), use_container_width=True)
+
+        # Calcul de la moyenne groupée, en renommant explicitement pour éviter les conflits
+        agg_df = (
+            df.groupby([cat1, cat2])[target_1]
+            .mean()
+            .rename("mean_value")
+            .reset_index()
+        )
+
+        # Affichage du graphique avec la colonne renommée
+        fig2d = px.bar(
+            agg_df,
+            x=cat1,
+            y="mean_value",
+            color=cat2,
+            barmode="group",
+            title=f"{target_1} moyen par {cat1} et {cat2}"
+        )
+        st.plotly_chart(fig2d, use_container_width=True)
 
 
 # =============================================================================

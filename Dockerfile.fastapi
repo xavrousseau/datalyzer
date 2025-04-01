@@ -17,7 +17,8 @@ COPY api /app
 RUN mkdir -p /app/data/uploads
 
 # Expose le port d’API
-EXPOSE 8000
+EXPOSE 8500
 
 # Commande de démarrage
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8500"]
+

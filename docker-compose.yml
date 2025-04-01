@@ -1,7 +1,7 @@
 # =============================================================================
 # VERSION DU FICHIER DOCKER COMPOSE
 # =============================================================================
-version: '3.9'  # On utilise la version 3.9 de Docker Compose, qui offre de nombreuses fonctionnalités modernes.
+# version: '3.9'  # On utilise la version 3.9 de Docker Compose, qui offre de nombreuses fonctionnalités modernes.
 
 
 # =============================================================================
@@ -17,7 +17,7 @@ services:
       context: .                  # Contexte de build : le répertoire courant (contenant le Dockerfile et le code source)
       dockerfile: Dockerfile.fastapi  # Nom du Dockerfile spécifique pour construire l'image FastAPI
     ports:
-      - "8000:8000"               # Expose le port 8000 du conteneur sur le port 8000 de l'hôte (accès à l'API via localhost:8000)
+      - "8500:8500"               # Expose le port 8500 du conteneur sur le port 8500 de l'hôte (accès à l'API via localhost:8000)
     volumes:
       - ./data:/app/data          # Monte le dossier local 'data' dans le conteneur à l'emplacement /app/data
                                   # Cela permet de partager et de persister les données entre le conteneur et l'hôte
