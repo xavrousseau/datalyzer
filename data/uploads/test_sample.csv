@@ -1,6 +1,0 @@
-building_id,city,building_type,year_built,num_floors,site_energy_use,ghg_emissions_total
-1001,Seattle,Office,1990,10,250000,1234
-1002,Seattle,Warehouse,1985,2,120000,567
-1003,Seattle,Office,2005,5,300000,1456
-1004,Seattle,Retail,1999,3,,789
-1005,Seattle,Office,2010,,275000,

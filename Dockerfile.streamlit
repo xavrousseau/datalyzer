@@ -4,14 +4,14 @@ FROM python:3.10-slim
 WORKDIR /app
 
 # Copie des dépendances en premier pour profiter du cache Docker
-COPY streamlit_app/requirements.txt .
+COPY ./streamlit_app/requirements.txt .
 
 # Installation des dépendances Python
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 # Copie du code source Streamlit
-COPY streamlit_app /app
+COPY ./streamlit_app /app
 
 # Création du dossier de données (si non présent au build)
 RUN mkdir -p /app/data/uploads /app/data/exports

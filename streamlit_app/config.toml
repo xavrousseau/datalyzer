@@ -1,0 +1,3 @@
+# 📄 .streamlit/config.toml
+[server]
+maxUploadSize = 1000  # en Mo (1 Go ici)

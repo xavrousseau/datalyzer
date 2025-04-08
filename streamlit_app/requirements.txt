@@ -9,3 +9,11 @@ loguru>=0.7
 
 # Dépendances implicites utiles
 matplotlib>=3.7
+
+# Extensions pour lecture multi-format
+openpyxl>=3.1         # lecture fichiers .xlsx
+pyarrow>=14.0         # lecture fichiers .parquet
+
+# Utilitaires spécifiques
+python-snappy>=0.6    # compression/snappy pour fichiers parquet (optionnel mais conseillé)
+psutil>=5.9
