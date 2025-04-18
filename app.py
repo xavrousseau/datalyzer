@@ -46,10 +46,8 @@ EDA_STEPS = {
 # 🧭 MENU DE NAVIGATION MODERNE
 # =============================================================================
 def nav_menu():
-    st.markdown("## 🚀 Navigation")
-    col1, col2 = st.columns([1, 2])
-
-    with col1:
+    with st.sidebar:
+        st.markdown("## 🚀 Navigation")
         st.markdown("### 📁 Chargement")
         if st.button("📂 Chargement", use_container_width=True):
             st.session_state.page = "chargement"
@@ -60,9 +58,7 @@ def nav_menu():
         if st.button("💾 Export", use_container_width=True):
             st.session_state.page = "export"
 
-    with col2:
         st.markdown("### 🔍 Analyse")
-        st.markdown("**Exploration & Qualité**")
         if st.button("🔍 Analyse EDA", use_container_width=True):
             st.session_state.page = "eda"
         if st.button("📊 Catégorielle", use_container_width=True):
@@ -74,7 +70,6 @@ def nav_menu():
         if st.button("🧪 Multivariée", use_container_width=True):
             st.session_state.page = "multi"
 
-    st.markdown("---")
 
 # Affichage du menu (toujours présent)
 nav_menu()

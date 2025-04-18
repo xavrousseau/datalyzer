@@ -1,5 +1,3 @@
-# config.py
-
 import streamlit as st
 
 def configure_app():
@@ -19,18 +17,37 @@ def configure_app():
 
             /* Boutons principaux */
             .stButton>button {
-                color: white;
-                background: #0099cc;
+                color: white !important;
+                background: #0099cc !important;
                 border-radius: 0.5rem;
                 padding: 0.5em 1em;
                 font-weight: 600;
                 transition: all 0.2s ease-in-out;
                 border: none;
+                animation: fadeIn 0.3s ease-in-out;
             }
 
             .stButton>button:hover {
                 transform: scale(1.03);
-                background-color: #007fa3;
+                background-color: #007fa3 !important;
+            }
+
+            .stButton>button:focus,
+            .stButton>button:active {
+                color: white !important;
+                background-color: #007fa3 !important;
+                outline: none !important;
+                box-shadow: 0 0 0 2px #007fa333;
+            }
+
+            /* Espacement entre les boutons sidebar */
+            .stSidebar .stButton {
+                margin-bottom: 0.5rem;
+            }
+
+            /* Supprime les soulignements involontaires dans les titres */
+            .stSidebar h2, .stSidebar h3 {
+                text-decoration: none !important;
             }
 
             /* Boutons de téléchargement */
@@ -69,7 +86,7 @@ def configure_app():
                 visibility: hidden;
             }
 
-            /* Mode responsive */
+            /* Responsive mobile */
             @media (max-width: 768px) {
                 .block-container {
                     padding: 0.5rem 1rem !important;
@@ -82,6 +99,12 @@ def configure_app():
                 .stButton>button, .stDownloadButton>button {
                     font-size: 0.9rem !important;
                 }
+            }
+
+            /* Animation d'apparition douce */
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
             }
         </style>
     """, unsafe_allow_html=True)
