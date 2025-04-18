@@ -58,6 +58,10 @@ def run_chargement():
 
             # Stockage dans la session pour les autres étapes
             st.session_state["df"] = df
+            if "dfs" not in st.session_state:
+                st.session_state["dfs"] = {}
+
+            st.session_state["dfs"][selected] = df
             st.success(f"✅ Fichier chargé : {selected} ({df.shape[0]} lignes, {df.shape[1]} colonnes)")
 
             # Logging et snapshot
