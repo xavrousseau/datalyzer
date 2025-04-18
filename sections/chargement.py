@@ -21,9 +21,9 @@ from utils.snapshot_utils import save_snapshot   # Pour sauvegarder le fichier c
 # Fonction utilitaire : récupère les fichiers valides dans le dossier data/inputs
 # -----------------------------------------------------------------------------
 def get_available_files():
-    """Retourne la liste des fichiers disponibles dans data/inputs."""
     input_dir = Path("data/inputs")
-    valid_exts = [".csv", ".xlsx", ".parquet"]
+    input_dir.mkdir(parents=True, exist_ok=True)  # 👈 Crée le dossier s'il n'existe pas
+    valid_exts = [".csv", ".xlsx", ".xls", ".parquet"]
     return [f.name for f in input_dir.iterdir() if f.suffix in valid_exts]
 
 # -----------------------------------------------------------------------------
@@ -36,7 +36,7 @@ def run_chargement():
     available_files = get_available_files()
 
     if not available_files:
-        st.warning("Aucun fichier trouvé dans `data/inputs/`. Veuillez en ajouter.")
+        st.warning("Aucun fichier disponible dans `data/inputs/`. Vous pouvez en déposer un manuellement via le menu latéral de Streamlit Cloud ou par Git.")
         return
 
     selected = st.selectbox("📁 Fichiers disponibles :", available_files)

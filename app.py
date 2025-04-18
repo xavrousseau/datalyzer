@@ -47,36 +47,35 @@ EDA_STEPS = {
 # =============================================================================
 def nav_menu():
     st.markdown("## 🚀 Navigation")
-    cols = st.columns(3)
+    col1, col2 = st.columns([1, 2])
 
-    with cols[0]:
+    with col1:
+        st.markdown("### 📁 Chargement")
         if st.button("📂 Chargement", use_container_width=True):
             st.session_state.page = "chargement"
         if st.button("🔗 Jointures", use_container_width=True):
             st.session_state.page = "jointures"
+        if st.button("🕰️ Snapshots", use_container_width=True):
+            st.session_state.page = "snapshots"
+        if st.button("💾 Export", use_container_width=True):
+            st.session_state.page = "export"
 
-    with cols[1]:
+    with col2:
+        st.markdown("### 🔍 Analyse")
+        st.markdown("**Exploration & Qualité**")
         if st.button("🔍 Analyse EDA", use_container_width=True):
             st.session_state.page = "eda"
         if st.button("📊 Catégorielle", use_container_width=True):
             st.session_state.page = "cat"
-
-    with cols[2]:
         if st.button("🎯 Cible", use_container_width=True):
             st.session_state.page = "cible"
         if st.button("🚨 Qualité", use_container_width=True):
             st.session_state.page = "qualite"
         if st.button("🧪 Multivariée", use_container_width=True):
             st.session_state.page = "multi"
-        if st.button("🕰️ Snapshots", use_container_width=True):
-            st.session_state.page = "snapshots"
-        if st.button("💾 Export", use_container_width=True):
-            st.session_state.page = "export"
 
     st.markdown("---")
 
-# Affichage du menu
-nav_menu()
 
 # =============================================================================
 # 📊 SIDEBAR : PROGRESSION EDA
