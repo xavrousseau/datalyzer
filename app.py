@@ -76,6 +76,8 @@ def nav_menu():
 
     st.markdown("---")
 
+# Affichage du menu (toujours présent)
+nav_menu()
 
 # =============================================================================
 # 📊 SIDEBAR : PROGRESSION EDA
