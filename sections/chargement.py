@@ -1,56 +1,74 @@
+# =============================================================================
 # sections/chargement.py
+#
+# Ce module gère la première étape de l'application Streamlit :
+# le chargement des fichiers de données CSV, XLSX ou Parquet.
+# Il permet :
+# - d'afficher les fichiers disponibles dans le dossier "data/inputs/"
+# - de charger dynamiquement un ou plusieurs fichiers
+# - de prévisualiser les 10 premières lignes du fichier actif
+# - de stocker le fichier chargé dans la session Streamlit
+# =============================================================================
 
-import streamlit as st
-import pandas as pd
-import csv
-from io import StringIO
-from utils.filters import select_active_dataframe
-from utils.log_utils import log_transformation
+import os                       # Pour lister les fichiers dans un dossier
+import streamlit as st          # Framework d'interface web
+import pandas as pd            # Manipulation de données
+from pathlib import Path       # Manipulation robuste de chemins
+from utils.log_utils import log_transformation   # Pour logguer le chargement
+from utils.snapshot_utils import save_snapshot   # Pour sauvegarder le fichier chargé
 
+# -----------------------------------------------------------------------------
+# Fonction utilitaire : récupère les fichiers valides dans le dossier data/inputs
+# -----------------------------------------------------------------------------
+def get_available_files():
+    """Retourne la liste des fichiers disponibles dans data/inputs."""
+    input_dir = Path("data/inputs")
+    valid_exts = [".csv", ".xlsx", ".parquet"]
+    return [f.name for f in input_dir.iterdir() if f.suffix in valid_exts]
+
+# -----------------------------------------------------------------------------
+# Fonction principale : gère l’étape de chargement de fichier
+# -----------------------------------------------------------------------------
 def run_chargement():
-    st.markdown("## 📂 Chargement de fichiers")
-    st.markdown("Téléversez un ou plusieurs fichiers de données pour commencer l'analyse.")
+    st.markdown("### 📂 Chargement de données")
+    st.markdown("Sélectionnez un fichier à charger depuis `data/inputs/` pour démarrer.")
 
-    # Choix des extensions supportées
-    uploaded_files = st.file_uploader(
-        "Sélectionnez un ou plusieurs fichiers",
-        type=["csv", "xlsx", "parquet"],
-        accept_multiple_files=True
-    )
+    available_files = get_available_files()
 
-    # Initialisation du dictionnaire de dataframes en session
-    if "dfs" not in st.session_state:
-        st.session_state["dfs"] = {}
+    if not available_files:
+        st.warning("Aucun fichier trouvé dans `data/inputs/`. Veuillez en ajouter.")
+        return
 
-    # Chargement des fichiers
-    if uploaded_files:
-        for file in uploaded_files:
-            name = file.name
-            ext = name.split(".")[-1].lower()
-            try:
-                if ext == "csv":
-                    text = file.read().decode("utf-8", errors="ignore")
-                    sep = csv.Sniffer().sniff(text[:2048]).delimiter
-                    df = pd.read_csv(StringIO(text), sep=sep)
-                elif ext == "xlsx":
-                    df = pd.read_excel(file)
-                elif ext == "parquet":
-                    df = pd.read_parquet(file)
-                else:
-                    st.warning(f"⚠️ Format non supporté : {ext}")
-                    continue
+    selected = st.selectbox("📁 Fichiers disponibles :", available_files)
 
-                # Sauvegarde dans la session
-                st.session_state["dfs"][name] = df
-                st.success(f"✅ {name} chargé ({df.shape[0]} lignes × {df.shape[1]} colonnes)")
-                log_transformation(f"Chargement : {name} – {df.shape[0]} lignes")
+    if st.button("✅ Valider ce fichier"):
+        ext = Path(selected).suffix
+        full_path = Path("data/inputs") / selected
 
-            except Exception as e:
-                st.error(f"❌ Erreur de lecture pour {name} : {e}")
+        try:
+            if ext == ".csv":
+                df = pd.read_csv(full_path)
+            elif ext == ".xlsx":
+                df = pd.read_excel(full_path)
+            elif ext == ".parquet":
+                df = pd.read_parquet(full_path)
+            else:
+                st.error("Format non supporté.")
+                return
 
-    # Affichage de l'aperçu du fichier principal sélectionné
-    if st.session_state["dfs"]:
-        st.markdown("### 🔍 Fichier sélectionné")
-        df, selected_name = select_active_dataframe()
-        st.markdown(f"**Fichier actif : `{selected_name}`**")
-        st.dataframe(df.head(10), use_container_width=True)
+            # Stockage dans la session pour les autres étapes
+            st.session_state["df"] = df
+            st.success(f"✅ Fichier chargé : {selected} ({df.shape[0]} lignes, {df.shape[1]} colonnes)")
+
+            # Logging et snapshot
+            log_transformation(f"Fichier {selected} chargé ({df.shape[0]} lignes)")
+            save_snapshot("raw_input")
+
+        except Exception as e:
+            st.error(f"Erreur lors du chargement : {e}")
+            return
+
+    # Affichage du DataFrame si déjà chargé
+    if "df" in st.session_state and st.session_state["df"] is not None:
+        st.markdown(f"🔍 Fichier sélectionné : `{selected}`")
+        st.dataframe(st.session_state["df"].head(10), use_container_width=True)
