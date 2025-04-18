@@ -9,11 +9,11 @@ def configure_app():
         initial_sidebar_state="expanded"
     )
 
-    # CSS personnalisé : boutons, sliders, barre de progression, responsive
+    # CSS global personnalisé
     st.markdown("""
         <style>
-            /* Polices cohérentes */
-            body, button, label, .css-1cpxqw2 {
+            /* Police harmonisée */
+            html, body, [class*="css"] {
                 font-family: "Segoe UI", "Roboto", sans-serif;
             }
 
@@ -23,7 +23,9 @@ def configure_app():
                 background: #0099cc;
                 border-radius: 0.5rem;
                 padding: 0.5em 1em;
+                font-weight: 600;
                 transition: all 0.2s ease-in-out;
+                border: none;
             }
 
             .stButton>button:hover {
@@ -37,6 +39,7 @@ def configure_app():
                 color: white;
                 border-radius: 0.5rem;
                 transition: all 0.2s ease-in-out;
+                border: none;
             }
 
             .stDownloadButton>button:hover {
@@ -44,9 +47,11 @@ def configure_app():
                 background-color: #218838;
             }
 
-            /* Slider */
+            /* Sliders */
             .stSlider>div {
                 background-color: #f0f0f5;
+                padding: 0.2em;
+                border-radius: 0.5rem;
             }
 
             /* Barre de progression */
@@ -54,22 +59,26 @@ def configure_app():
                 background-color: #00c49a;
             }
 
-            /* Masquer le footer Streamlit */
+            /* En-têtes */
+            h1, h2, h3 {
+                font-weight: 700;
+            }
+
+            /* Masquer footer Streamlit */
             footer {
                 visibility: hidden;
             }
 
-            /* Responsive mobile */
+            /* Mode responsive */
             @media (max-width: 768px) {
                 .block-container {
                     padding: 0.5rem 1rem !important;
                 }
-                .css-18ni7ap {
-                    padding-top: 0 !important;
-                }
+
                 h1, h2, h3 {
                     font-size: 1.2rem !important;
                 }
+
                 .stButton>button, .stDownloadButton>button {
                     font-size: 0.9rem !important;
                 }

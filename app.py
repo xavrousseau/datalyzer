@@ -50,27 +50,27 @@ def nav_menu():
     cols = st.columns(3)
 
     with cols[0]:
-        if st.button("📂 Chargement"):
+        if st.button("📂 Chargement", use_container_width=True):
             st.session_state.page = "chargement"
-        if st.button("🔗 Jointures"):
+        if st.button("🔗 Jointures", use_container_width=True):
             st.session_state.page = "jointures"
 
     with cols[1]:
-        if st.button("🔍 Analyse EDA"):
+        if st.button("🔍 Analyse EDA", use_container_width=True):
             st.session_state.page = "eda"
-        if st.button("📊 Catégorielle"):
+        if st.button("📊 Catégorielle", use_container_width=True):
             st.session_state.page = "cat"
 
     with cols[2]:
-        if st.button("🎯 Cible"):
+        if st.button("🎯 Cible", use_container_width=True):
             st.session_state.page = "cible"
-        if st.button("🚨 Qualité"):
+        if st.button("🚨 Qualité", use_container_width=True):
             st.session_state.page = "qualite"
-        if st.button("🧪 Multivariée"):
+        if st.button("🧪 Multivariée", use_container_width=True):
             st.session_state.page = "multi"
-        if st.button("🕰️ Snapshots"):
+        if st.button("🕰️ Snapshots", use_container_width=True):
             st.session_state.page = "snapshots"
-        if st.button("💾 Export"):
+        if st.button("💾 Export", use_container_width=True):
             st.session_state.page = "export"
 
     st.markdown("---")
