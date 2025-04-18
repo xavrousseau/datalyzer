@@ -47,13 +47,38 @@ def get_duplicate_summary(df: pd.DataFrame, cols: list[str] = None) -> dict:
     n_dupes = len(dupes)
     pct = round((n_dupes / total) * 100, 2) if total > 0 else 0.0
     return {"total": total, "duplicates": n_dupes, "percent": pct}
+ 
 
 def select_active_dataframe():
+    """
+    Permet à l'utilisateur de choisir un fichier actif parmi ceux déjà chargés.
+    Affiche un bouton de validation explicite.
+    Retourne le DataFrame sélectionné et son nom uniquement après validation.
+    """
     all_dfs = st.session_state.get("dfs", {})
-    if not all_dfs:
-        st.warning("❌ Aucun fichier chargé.")
-        st.stop()
-    selected_name = st.selectbox("📁 Choisissez un fichier à analyser", list(all_dfs.keys()), key="global_df_selector")
-    st.session_state["df"] = all_dfs[selected_name]
-    return all_dfs[selected_name], selected_name
 
+    if not all_dfs:
+        st.warning("⚠️ Aucun fichier n'a été chargé.")
+        st.stop()
+
+    filenames = list(all_dfs.keys())
+
+    selected_name = st.selectbox(
+        "📁 Choisissez un fichier à analyser :",
+        filenames,
+        key="global_df_selector"
+    )
+
+    # Affiche les dimensions et un aperçu
+    df_preview = all_dfs[selected_name]
+    st.info(f"📄 `{selected_name}` – {df_preview.shape[0]} lignes × {df_preview.shape[1]} colonnes")
+    st.dataframe(df_preview.head(5), use_container_width=True)
+
+    # Bouton explicite de validation
+    if st.button("✅ Valider ce fichier"):
+        st.session_state["df"] = df_preview
+        st.success(f"✅ Fichier sélectionné : `{selected_name}`")
+        return df_preview, selected_name
+
+    # Ne retourne rien tant que non validé
+    return None, None
