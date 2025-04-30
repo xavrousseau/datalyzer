@@ -1,219 +1,179 @@
-# EDA Explorer – FastAPI + Streamlit + Docker
-
-Ce projet vous permet de faire une **analyse exploratoire de données (EDA)** sur n'importe quel fichier CSV, avec une interface interactive **Streamlit** et une API **FastAPI**.
+Parfait, voici un **README complet et professionnel** pour ton projet **Datalyzer**, en mode 100 % Streamlit, fusionnant intelligemment le fond de ton ancien README avec la structure claire de la nouvelle version. Ce document est conçu pour une présentation sérieuse, claire et réutilisable sur GitHub ou en démo client.
 
 ---
 
-## Fonctionnalités
+# 🌸 Datalyzer – Analyse exploratoire et nettoyage intelligent de données
 
-- Upload de fichier CSV
-- Aperçu des données (`head`)
-- Valeurs manquantes (nombre + pourcentage)
-- Statistiques descriptives (`describe`)
-- Détection et suppression des doublons
-- Suppression de colonnes
-- Génération d’un rapport CSV téléchargeable
-- Export du dataset nettoyé
-- Graphiques interactifs avec Plotly (via Streamlit)
-- Architecture Docker avec `docker-compose`
+Datalyzer est une application interactive construite avec **Streamlit** pour explorer, nettoyer, analyser et exporter vos données tabulaires (CSV, Excel, etc.). Conçue pour des analyses EDA poussées, elle offre une interface fluide et zen qui guide chaque étape du processus.
 
 ---
 
-## Structure du projet
+## 🚀 Fonctionnalités clés
+
+- ✅ Import de fichiers CSV ou Excel
+- 🧬 Détection automatique des types de variables
+- 🔍 Analyse exploratoire interactive (types, valeurs manquantes, outliers, stats...)
+- 🧹 Nettoyage automatique : valeurs manquantes, colonnes constantes, faible variance
+- 🧾 Correction manuelle des types (int, float, bool, datetime...)
+- 💡 Suggestions de traitement (encodage, vectorisation, suppression)
+- 🔗 Fusion intelligente de fichiers par clés communes
+- 📈 Analyse multivariée (ACP, clustering, corrélations)
+- 🎯 Analyse ciblée avec croisement variable cible / explicative
+- 🧪 Évaluation de la qualité des données (score global, heatmap, red flags)
+- 💾 Export des données nettoyées dans plusieurs formats (CSV, XLSX, JSON, Parquet)
+- 🕰️ Gestion complète des snapshots (états intermédiaires)
+- 📊 Interface interactive avec **Plotly**, entièrement pilotée depuis **Streamlit**
+
+---
+
+## 🗂️ Structure du projet
 
 ```
-eda_explorer/
-├── api/                    ← Backend FastAPI
-│   ├── main.py
-│   ├── test_api.py
-│   └── requirements.txt
+datalyzer/
+├── app.py                  ← Application principale (navigation Streamlit)
+├── config.py               ← Configuration graphique & thème
+├── sections/               ← Modules fonctionnels de l'application
+│   ├── exploration.py
+│   ├── typage.py
+│   ├── suggestions.py
+│   ├── qualite.py
+│   ├── anomalies.py
+│   ├── multivariee.py
+│   ├── cat_analysis.py
+│   ├── cible.py
+│   ├── jointures.py
+│   ├── export.py
+│   ├── fichiers.py
+│   └── snapshots.py
 │
-├── streamlit_app/          ← Interface utilisateur
-│   ├── app.py
-│   └── requirements.txt
+├── utils/                  ← Fonctions utilitaires
+│   ├── eda_utils.py
+│   ├── filters.py
+│   ├── log_utils.py
+│   └── snapshot_utils.py
 │
-├── data/uploads/           ← Dossiers pour fichiers CSV
-│   └── test_sample.csv
+├── data/                   ← Dossiers pour sauvegardes et exports
+│   ├── snapshots/
+│   └── exports/
 │
-├── Dockerfile.fastapi
-├── Dockerfile.streamlit
-├── docker-compose.yml
-├── .dockerignore
-└── README.md
+├── images/                 ← Illustrations et fonds de page
+├── requirements.txt        ← Dépendances Python
+└── README.md               ← Ce fichier
 ```
 
 ---
 
-## Lancement de l'application (Docker Compose)
+## ▶️ Lancement de l'application
+
+### 1. Installation des dépendances
 
 ```bash
-docker-compose up --build
+pip install -r requirements.txt
 ```
 
-- **Streamlit** : http://localhost:8501  
-- **API FastAPI (Swagger UI)** : http://localhost:8000/docs
-
----
-
-## Utilisation des tests API et UI
-
-Un jeu de données est déjà présent : `data/uploads/test_sample.csv`.
-
-### Pour tester l'API automatiquement :
+### 2. Démarrage de l'application
 
 ```bash
-docker exec -it <nom_du_conteneur_fastapi> bash
-python tests/test_api.py
+streamlit run app.py
 ```
 
----
-
-## API – Endpoints disponibles
-
-| Méthode | Endpoint             | Description |
-|---------|----------------------|-------------|
-| POST    | /upload/             | Upload CSV |
-| GET     | /head?n=5            | Aperçu du DataFrame |
-| GET     | /missing-values/     | Valeurs manquantes |
-| GET     | /describe/           | Stats descriptives |
-| GET     | /duplicates/         | Infos sur doublons |
-| POST    | /drop-duplicates/    | Supprimer doublons |
-| POST    | /drop-columns/       | Supprimer colonnes |
-| GET     | /export/             | Télécharger CSV nettoyé |
-| GET     | /report/             | Rapport descriptif CSV |
+L'application s’ouvre automatiquement dans votre navigateur par défaut.
 
 ---
 
-## Auteur
+## 📁 Formats supportés
 
-Projet généré automatiquement avec l’assistance de ChatGPT et Dockerisé pour un usage local ou cloud-ready.
-
-
----
-
-## Tests Streamlit (UI)
-
-Un test E2E est fourni avec Playwright.
-
-### Installation des dépendances :
-
-```bash
-pip install -r tests/requirements-tests.txt
-playwright install
-```
-
-### Exécution du test :
-
-```bash
-pytest tests/test_streamlit.py
-```
-
-Assurez-vous que l'interface Streamlit est en cours d'exécution à l'adresse : http://localhost:8501
-
+- `.csv` (standard)
+- `.xlsx` (Excel)
+- `.json` (en ligne ou objet)
+- `.parquet` (colonnes compressées, recommandé)
 
 ---
 
-## Fonctionnalités avancées EDA (dans Streamlit)
+## 📦 Export multi-format
 
-- 🔍 **Détection automatique des types de variables** (numérique, catégorielle, binaire)
-- 📊 **Heatmap de corrélation** entre variables numériques
-- 🚨 **Détection des outliers** (méthode IQR)
-- 🧹 **Suggestions de nettoyage** :
-  - Colonnes constantes
-  - Faible variance
-- 🔄 **Encodage des colonnes catégorielles** (OneHot ou Ordinal)
+À tout moment, vous pouvez exporter le fichier nettoyé :
+- en `.csv` classique
+- en `.xlsx` (Excel)
+- en `.json` formaté
+- en `.parquet` (optimisé pour la taille)
 
-Accessible directement via l'interface Streamlit.
-
+Un **log d’action** est généré à chaque export dans `logs/`.
 
 ---
 
-## Blocs EDA avancés disponibles dans l'interface
+## 🕰️ Snapshots intelligents
 
-Chaque bloc est indépendant et facultatif :
-
-- **🔍 Types de variables** : détecte automatiquement les colonnes numériques, catégorielles, binaires.
-- **📊 Corrélation** : affiche une heatmap interactive entre les variables numériques.
-- **🚨 Outliers (IQR)** : détecte et affiche les lignes extrêmes pour une variable numérique.
-- **🧹 Suggestions nettoyage** :
-  - Colonnes constantes
-  - Faible variance
-  - Valeurs manquantes
-- **🔄 Encodage** : One-Hot ou Ordinal sur les variables sélectionnées.
-
-Accessible directement dans l'app Streamlit (avec `st.expander()`).
-
+Chaque transformation (filtrage, nettoyage, typage, jointure...) peut être **sauvegardée** sous forme de snapshot. Ces snapshots sont listés, restaurables et supprimables à volonté depuis l’interface.
 
 ---
 
-## 📈 Visualisations interactives
+## 🔒 Logs automatiques
 
-- Histogrammes, boxplots, nuages de points
-- Sélection dynamique des axes et des couleurs
-- Affichage via **Plotly Express** intégré à l'interface Streamlit
+Chaque action utilisateur déclenche un **log** dans `logs/eda_actions.log`, incluant :
 
-
----
-
-## 📊 Graphiques exploratoires métiers
-
-Inspirés du notebook original :
-
-- Moyenne de consommation par type de bâtiment
-- Moyenne d’émissions GES par type de bâtiment
-- Distribution de la consommation énergétique
-- Corrélation avec la consommation d'énergie
-
-Accessibles dans la section `📊 Graphiques exploratoires métiers` de l'app Streamlit.
-
+- Date/heure
+- Étape
+- Résumé de la transformation
 
 ---
 
-## 🎯 Sélection des variables cibles
+## 📸 Interface graphique enrichie
 
-Vous pouvez désormais choisir :
-- Une **variable cible principale** (ex : consommation d'énergie)
-- Une **variable secondaire** (ex : émissions GES)
+Datalyzer utilise **Streamlit + Plotly** avec :
 
-Ces choix sont utilisés automatiquement dans :
-- Les graphiques métiers
-- Les corrélations
-- Les analyses avancées
-
----
-
-## ℹ️ Aides contextuelles intégrées
-
-Chaque bloc de l'application contient désormais des **explications claires** :
-- Ce qu’il fait
-- Ce qu’il attend
-- Comment interpréter les résultats
-
-Idéal pour les utilisateurs non techniques.
-
+- Thème adaptatif et fluide
+- Progression dynamique des étapes
+- Menu latéral personnalisé
+- Affichage par onglets (`st.tabs`)
+- Visualisation interactive (histogrammes, boxplots, scatter, heatmap...)
 
 ---
 
-## 🎨 Graphiques interactifs ajoutés
+## 📊 Blocs d’analyse disponibles
 
-- 📦 **Boxplot interactif** : dispersion par catégorie
-- 🧮 **Scatter plot** : relation entre deux variables numériques avec couleur
-- 🔀 **Graphique croisé** : moyenne d’une variable cible selon deux catégories
-- ✅ Les anciens graphiques métiers utilisent maintenant une **variable catégorielle sélectionnable**, pas `building_type`
-
-
-
----
-
-## 📄 Rapport HTML automatique
-
-- Généré via `ydata-profiling` (anciennement pandas-profiling)
-- Contient les statistiques descriptives, distributions, corrélations, alertes, etc.
-- Téléchargeable depuis l’interface
+| Bloc | Contenu |
+|------|---------|
+| **Exploration** | Types, NA, stats, outliers, nettoyage |
+| **Typage** | Suggestions + correction |
+| **Suggestions** | Encodage / vectorisation recommandée |
+| **Qualité** | Score, heatmap, vérifications critiques |
+| **Multivariée** | ACP, clustering, projection, Cramér’s V |
+| **Catégorielle** | Boxplots, croisement de modalités |
+| **Cible** | Analyse ciblée d'une variable à expliquer |
+| **Jointures** | Fusion intelligente de fichiers |
+| **Export** | Sélection, format, téléchargement |
+| **Snapshots** | Sauvegardes, chargement, suppression |
 
 ---
 
-## 💾 Sauvegarde finale avec logs
+## 🎨 Thème & Design
 
-- Le DataFrame transformé est sauvegardé au format `.parquet` dans `data/exports/`
-- Un fichier `logs/eda_transformations.log` enregistre les opérations réalisées (nettoyage, encodage, etc.)
+- Couleurs pastel inspirées du Japon zen
+- Illustrations pour chaque bloc (fond personnalisé)
+- Animation douce & feedback visuel
+- Icônes et emojis pour une navigation intuitive
+
+---
+
+## 🧪 Tests recommandés
+
+- Vérifiez l’import, les jointures et les exports manuellement
+- Vérifiez les logs dans `logs/eda_actions.log`
+- Vérifiez la création automatique de `snapshots/` et `exports/`
+
+---
+
+## 📌 Remarques
+
+- Le projet ne nécessite **aucune base de données ni backend**.
+- L'application fonctionne **100 % localement**, sans connexion externe.
+- L’architecture est **modulaire et extensible** (ajout de blocs, logs, logs visuels, plugins...).
+
+---
+
+## 👤 Auteur
+
+Ce projet est une initiative personnelle conçue par **Xavier Rousseau**, Data Engineer & Analyst, passionné de qualité des données, visualisation et automatisation.
+
+ 

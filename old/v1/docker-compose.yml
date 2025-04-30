@@ -1,0 +1,33 @@
+# =============================================================================
+# VERSION DU FICHIER DOCKER COMPOSE
+# =============================================================================
+# version: '3.9'  # On utilise la version 3.9 de Docker Compose, qui offre de nombreuses fonctionnalités modernes.
+
+
+# =============================================================================
+# DÉFINITION DES SERVICES
+# =============================================================================
+services:
+
+  # ---------------------------------------------------------------------------
+  # SERVICE STREAMLIT
+  # ---------------------------------------------------------------------------
+  streamlit:
+    # Configuration de la construction de l'image pour le service streamlit
+    build:
+      context: .                  # Contexte de build : le répertoire courant
+      dockerfile: Dockerfile.streamlit  # Utilise le Dockerfile dédié à Streamlit pour construire l'image
+    ports:
+      - "8501:8501"               # Expose le port 8501 du conteneur sur le port 8501 de l'hôte (accès à l'interface Streamlit via localhost:8501)
+    volumes:
+      - ./data:/app/data          # Monte le même dossier 'data' que pour FastAPI afin d'avoir accès aux mêmes fichiers
+    networks:
+      - eda-net                   # Connecte ce service au même réseau "eda-net" pour faciliter la communication entre les services
+
+
+# =============================================================================
+# CONFIGURATION DU RÉSEAU
+# =============================================================================
+networks:
+  eda-net:
+    driver: bridge              # Utilise le driver "bridge" par défaut pour le réseau, ce qui permet aux conteneurs de communiquer

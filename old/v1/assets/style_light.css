@@ -1,0 +1,136 @@
+/* ============================================================
+   🌸 DATALYZER — Thème Clair Japonais
+   Style Streamlit personnalisé pour une ambiance zen et lisible
+   ============================================================ */
+
+/* ------ Structure globale ------ */
+html, body, [class*="css"] {
+    font-family: "Noto Sans JP", "Segoe UI", sans-serif;
+    background-color: #f6f1e9;  /* Fond beige doux */
+    color: #333333;
+}
+
+/* ------ Titres ------ */
+h1, h2, h3 {
+    color: #a73c3c;              /* Rouge japonais foncé */
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+/* ------ Textes courants ------ */
+p, span, div {
+    color: #444 !important;      /* Contraste doux */
+}
+
+/* ------ Inputs, selects, texte : fond clair + texte noir ------ */
+input, select, textarea,
+.stTextInput > div > input,
+.stTextArea textarea,
+.stMultiSelect > div,
+.stSelectbox > div,
+[data-baseweb="select"] > div {
+    background-color: #ffffff !important;
+    color: #111 !important;
+}
+
+/* Labels dans les sélecteurs */
+.stSelectbox label,
+.stMultiSelect label {
+    color: #444 !important;
+}
+
+/* 🎯 CORRECTION : liste déroulante des selectbox */
+div[data-baseweb="select"] div[role="listbox"] {
+    background-color: #ffffff !important;
+    color: #111 !important;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    box-shadow: 0px 2px 6px rgba(0,0,0,0.1);
+}
+
+div[data-baseweb="select"] div[role="option"] {
+    background-color: #fff !important;
+    color: #111 !important;
+}
+
+div[data-baseweb="select"] div[role="option"]:hover {
+    background-color: #f7e7e1 !important;
+}
+
+/* ------ Sidebar ------ */
+section[data-testid="stSidebar"] {
+    background-color: #fef7f2;
+    border-right: 1px solid #ddd;
+    color: #333;
+}
+
+/* ------ Boutons classiques ------ */
+.stButton > button {
+    background-color: #d66853;
+    color: white;
+    border-radius: 0.5rem;
+    padding: 0.4em 1em;
+    font-weight: bold;
+    border: none;
+    transition: all 0.3s ease-in-out;
+}
+.stButton > button:hover {
+    background-color: #b9493e;
+    transform: scale(1.05);
+}
+
+/* ------ Boutons de téléchargement ------ */
+.stDownloadButton > button {
+    background-color: #50a75d;
+    color: white;
+    border-radius: 0.5rem;
+    font-weight: 600;
+}
+.stDownloadButton > button:hover {
+    background-color: #3c8948;
+    transform: scale(1.03);
+}
+
+/* ------ Conteneurs de sections ------ */
+div[data-testid="stVerticalBlock"] {
+    background-color: #ffffff;
+    border-radius: 0.7rem;
+    padding: 1rem;
+    box-shadow: 0 0 8px rgba(0,0,0,0.05);
+    margin-bottom: 1rem;
+}
+
+/* ------ Expanders ------ */
+.st-expander {
+    background-color: #f6f1ea;
+    border: 1px solid #ddd;
+    border-radius: 0.5rem;
+}
+
+/* ------ Barres de progression ------ */
+.stProgress > div > div {
+    background-color: #d66853;
+}
+
+/* ------ Messages (alertes, infos, erreurs...) ------ */
+.stAlert {
+    background-color: #fef2f0;
+    border-radius: 0.6rem;
+    color: #333 !important;
+}
+
+/* ------ Footer Streamlit et menu burger cachés ------ */
+footer, .css-qri22k {
+    display: none;
+}
+
+/* ------ Responsive mobile ------ */
+@media (max-width: 768px) {
+    h1, h2 {
+        font-size: 1.3rem !important;
+    }
+    .stButton > button {
+        font-size: 0.9rem;
+    }
+    .stTextInput > div > input, .stSelectbox > div { font-size: 0.85rem; }
+}

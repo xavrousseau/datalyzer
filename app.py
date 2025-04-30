@@ -1,130 +1,99 @@
-# app.py
+# ============================================================
+# Fichier : app.py
+# Objectif : Point d’entrée principal de Datalyzer — Version Pro
+# ============================================================
 
 import streamlit as st
+from datetime import datetime
 
-# Configuration de la page Streamlit
-from config import configure_app
+from config import configure_app, EDA_STEPS
+from utils.ui_utils import show_header_image_safe
 
-# Utils (depuis dossier utils/)
-from utils.snapshot_utils import save_snapshot, restore_snapshot
-from utils.log_utils import log_transformation
-from utils.filters import select_active_dataframe
-
-# Sections fonctionnelles
-from sections.chargement import run_chargement
-from sections.jointures import run_jointures
-from sections.analyse_explo import run_analyse_exploratoire
-from sections.analyse_cat import run_analyse_categorielle
-from sections.cible import run_cible
+# 📦 Import des vraies pages
+from sections.home import run_home
+from sections.exploration import run_exploration
+from sections.typage import run_typage
 from sections.qualite import run_qualite
 from sections.multivariee import run_multivariee
-from sections.snapshots import run_snapshots
+from sections.anomalies import run_anomalies
+from sections.cat_analysis import run_analyse_categorielle
+from sections.cible import run_cible
+from sections.fichiers import run_chargement
+from sections.jointures import run_jointures
 from sections.export import run_export
+from sections.suggestions import run_suggestions
 
-# =============================================================================
-# 🎨 INITIALISATION
-# =============================================================================
+# 🛠️ Initialisation de l’app
 configure_app()
 
-if "page" not in st.session_state:
-    st.session_state.page = "chargement"
+# 🧹 Initialisation état
+st.session_state.setdefault("page", "home")
+st.session_state.setdefault("dfs", {})
+st.session_state.setdefault("validation_steps", {})
 
-# =============================================================================
-# ✅ ÉTAPES CLÉS DU MODULE EDA
-# =============================================================================
-EDA_STEPS = {
-    "types": "🧾 Types",
-    "missing": "❓ Manquants",
-    "histos": "📊 Distributions",
-    "outliers": "🚨 Outliers",
-    "stats": "📈 Stats",
-    "cleaning": "🧹 Nettoyage",
-    "correlations": "🔗 Corrélations"
-}
-
-# =============================================================================
-# 🧭 MENU DE NAVIGATION MODERNE
-# =============================================================================
+# 🎴 Sidebar stylée
 def nav_menu():
     with st.sidebar:
-        st.markdown("## 🚀 Navigation")
-        st.markdown("### 📁 Chargement")
-        if st.button("📂 Chargement", use_container_width=True):
+        show_header_image_safe("sidebars/sidebar_geisha_full.png", height=240)
+
+        st.markdown("## 🎨 Choix du thème")
+        choix = st.selectbox("Sélectionnez un thème", ["clair", "sombre", "auto"])
+        if choix == "auto":
+            hour = datetime.now().hour
+            st.session_state.theme = "dark" if hour < 7 or hour > 19 else "light"
+        else:
+            st.session_state.theme = "light" if choix == "clair" else "dark"
+
+        st.markdown("---")
+        st.markdown("## 🏯 Navigation")
+
+        if st.button("🏠 Accueil", use_container_width=True):
+            st.session_state.page = "home"
+
+        if st.button("📂 Chargement & Snapshots", use_container_width=True):
             st.session_state.page = "chargement"
         if st.button("🔗 Jointures", use_container_width=True):
             st.session_state.page = "jointures"
-        if st.button("🕰️ Snapshots", use_container_width=True):
-            st.session_state.page = "snapshots"
         if st.button("💾 Export", use_container_width=True):
             st.session_state.page = "export"
 
-        st.markdown("### 🔍 Analyse")
-        if st.button("🔍 Analyse EDA", use_container_width=True):
-            st.session_state.page = "eda"
-        if st.button("📊 Catégorielle", use_container_width=True):
+        st.markdown("---")
+        st.markdown("## 🔍 Analyse")
+
+        if st.button("🔎 Exploration", use_container_width=True):
+            st.session_state.page = "exploration"
+        if st.button("🧾 Typage", use_container_width=True):
+            st.session_state.page = "typage"
+        if st.button("🧪 Qualité", use_container_width=True):
+            st.session_state.page = "qualite"
+        if st.button("📊 Analyse Multivariée", use_container_width=True):
+            st.session_state.page = "multivariee"
+        if st.button("🚨 Anomalies", use_container_width=True):
+            st.session_state.page = "anomalies"
+        if st.button("📋 Analyse Catégorielle", use_container_width=True):
             st.session_state.page = "cat"
         if st.button("🎯 Cible", use_container_width=True):
             st.session_state.page = "cible"
-        if st.button("🚨 Qualité", use_container_width=True):
-            st.session_state.page = "qualite"
-        if st.button("🧪 Multivariée", use_container_width=True):
-            st.session_state.page = "multi"
+        if st.button("💡 Suggestions", use_container_width=True):
+            st.session_state.page = "suggestions"
 
-
-# Affichage du menu (toujours présent)
 nav_menu()
 
-# =============================================================================
-# 📊 SIDEBAR : PROGRESSION EDA
-# =============================================================================
-if "dfs" in st.session_state and st.session_state["dfs"]:
-    validation = st.session_state.get("validation_steps", {})
-    n_total = len(EDA_STEPS)
-    n_done = sum(1 for k in EDA_STEPS if validation.get(k))
-    progress_pct = int(n_done / n_total * 100)
+# 🚀 Routing
+routes = {
+    "home": run_home,
+    "chargement": run_chargement,
+    "jointures": run_jointures,
+    "export": run_export,
+    "exploration": run_exploration,
+    "typage": run_typage,
+    "qualite": run_qualite,
+    "multivariee": run_multivariee,
+    "anomalies": run_anomalies,
+    "cat": run_analyse_categorielle,
+    "cible": run_cible,
+    "suggestions": run_suggestions
+}
 
-    st.sidebar.markdown("### 📊 Progression analyse EDA")
-    st.sidebar.progress(progress_pct / 100)
-    st.sidebar.markdown(f"**{n_done} / {n_total} étapes validées ({progress_pct}%)**")
-
-    st.sidebar.markdown("### 📌 Étapes")
-    for key, label in EDA_STEPS.items():
-        status = "✅" if validation.get(key) else "🔲"
-        st.sidebar.write(f"{status} {label}")
-
-    if st.sidebar.button("🔄 Réinitialiser l'analyse"):
-        st.session_state["validation_steps"] = {}
-        st.success("✔️ Progression réinitialisée.")
-
-# =============================================================================
-# 🔁 ROUTAGE VERS LES SECTIONS
-# =============================================================================
-if st.session_state.page == "chargement":
-    run_chargement()
-
-elif st.session_state.page == "snapshots":
-    run_snapshots()
-
-else:
-    df, selected_name = select_active_dataframe()
-
-    if st.session_state.page == "jointures":
-        run_jointures()
-    elif st.session_state.page == "eda":
-        run_analyse_exploratoire(df)
-    elif st.session_state.page == "cat":
-        run_analyse_categorielle(df)
-    elif st.session_state.page == "cible":
-        run_cible(df)
-    elif st.session_state.page == "qualite":
-        run_qualite(df)
-    elif st.session_state.page == "multi":
-        run_multivariee(df)
-    elif st.session_state.page == "export":
-        run_export(df)
-
-    # 🎉 Affichage du message final si toutes les étapes sont complétées
-    all_steps_done = all(st.session_state.get("validation_steps", {}).get(k) for k in EDA_STEPS)
-    if all_steps_done:
-        st.balloons()
-        st.success("🎉 Toutes les étapes EDA ont été complétées avec succès ! Vous pouvez exporter ou approfondir votre analyse.")
+if st.session_state.page in routes:
+    routes[st.session_state.page]()

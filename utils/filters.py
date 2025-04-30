@@ -1,84 +1,89 @@
-# utils/filters.py
-import pandas as pd
+# ============================================================
+# Fichier : filters.py
+# Objectif : Fonctions utilitaires pour Datalyzer
+# Sélection de fichier actif, validation d'étapes, filtrages
+# Version robuste sans doublons d'alertes
+# ============================================================
+
 import streamlit as st
+import pandas as pd
+from utils.snapshot_utils import save_snapshot
 
+# ============================================================
+# 🔁 Sélecteur du fichier actif
+# ============================================================
 
-def filter_duplicates(df: pd.DataFrame, cols: list[str] = None) -> pd.DataFrame:
+def get_active_dataframe() -> tuple[pd.DataFrame, str] | tuple[None, None]:
     """
-    Retourne les lignes dupliquées dans un DataFrame.
-    Si `cols` est fourni, utilise uniquement ces colonnes pour détecter les doublons.
+    Permet de sélectionner dynamiquement un fichier chargé via un selectbox.
+    Retourne un tuple (DataFrame, nom) si un fichier est actif, sinon (None, None).
+    Affiche un warning une seule fois en cas d'absence.
     """
-    if cols:
-        return df[df.duplicated(subset=cols, keep=False)]
-    return df[df.duplicated(keep=False)]
+    dfs = st.session_state.get("dfs", {})
+    if not dfs:
+        return None, None  # ⚡ Warning doit être géré au niveau appelant pour éviter doublon
 
+    options = list(dfs.keys())
+    selected = st.selectbox("🗂️ Sélectionner un fichier à analyser :", options, key="global_df_selector")
+    df = dfs.get(selected)
 
-def remove_duplicates(df: pd.DataFrame, cols: list[str] = None) -> pd.DataFrame:
+    if isinstance(df, pd.DataFrame):
+        st.session_state.df = df
+        return df, selected
+    else:
+        return None, None
+
+# ============================================================
+# 🧹 Validation d’étape avec bouton et snapshot intelligent
+# ============================================================
+
+def mark_step_done(step: str, custom_name: str = None):
     """
-    Supprime les doublons du DataFrame.
-    Si `cols` est fourni, supprime les doublons en se basant sur ces colonnes.
+    Marque une étape comme validée dans la session et sauvegarde un snapshot.
+    Si l'étape est déjà validée, ne fait rien (pas de double warning).
     """
-    return df.drop_duplicates(subset=cols if cols else None)
+    st.session_state.setdefault("validation_steps", {})
 
+    if st.session_state["validation_steps"].get(step):
+        return  # ⚡ Ne spamme pas un warning si déjà validé
+    
+    st.session_state["validation_steps"][step] = True
 
-def filter_columns(df: pd.DataFrame, cols_to_keep: list[str]) -> pd.DataFrame:
+    snapshot_label = (custom_name or f"{step}_validated").strip().replace(" ", "_")
+    if not snapshot_label.replace("_", "").isalnum():
+        st.warning("❌ Nom de snapshot invalide : utilisez uniquement lettres, chiffres et underscores.")
+        return
+
+    try:
+        save_snapshot(label=snapshot_label)
+        st.success(f"✅ Étape '{step}' validée et snapshot '{snapshot_label}' sauvegardé.")
+    except Exception as e:
+        st.error(f"❌ Erreur pendant la sauvegarde : {e}")
+
+def validate_step_button(step_name: str, label: str = "✅ Valider l’étape", context_prefix: str = ""):
     """
-    Ne garde que les colonnes spécifiées dans `cols_to_keep`.
+    Affiche un champ + bouton de validation d’étape avec snapshot optionnel.
+    Le context_prefix permet d'assurer l'unicité des clés Streamlit.
     """
-    return df[cols_to_keep]
-
-
-def drop_columns(df: pd.DataFrame, cols_to_drop: list[str]) -> pd.DataFrame:
-    """
-    Supprime les colonnes spécifiées dans `cols_to_drop` du DataFrame.
-    """
-    return df.drop(columns=cols_to_drop, errors="ignore")
-
-
-def get_duplicate_summary(df: pd.DataFrame, cols: list[str] = None) -> dict:
-    """
-    Retourne un résumé des doublons détectés :
-    - nombre total de lignes
-    - nombre de doublons
-    - pourcentage de doublons
-    """
-    total = len(df)
-    dupes = filter_duplicates(df, cols)
-    n_dupes = len(dupes)
-    pct = round((n_dupes / total) * 100, 2) if total > 0 else 0.0
-    return {"total": total, "duplicates": n_dupes, "percent": pct}
- 
-
-def select_active_dataframe():
-    """
-    Permet à l'utilisateur de choisir un fichier actif parmi ceux déjà chargés.
-    Affiche un bouton de validation explicite.
-    Retourne le DataFrame sélectionné et son nom uniquement après validation.
-    """
-    all_dfs = st.session_state.get("dfs", {})
-
-    if not all_dfs:
-        st.warning("⚠️ Aucun fichier n'a été chargé.")
-        st.stop()
-
-    filenames = list(all_dfs.keys())
-
-    selected_name = st.selectbox(
-        "📁 Choisissez un fichier à analyser :",
-        filenames,
-        key="global_df_selector"
+    custom = st.text_input(
+        f"Nom du snapshot pour l'étape `{step_name}` (optionnel)", 
+        key=f"{context_prefix}name_{step_name}"
     )
+    if st.button(label, key=f"{context_prefix}validate_{step_name}"):
+        mark_step_done(step_name, custom_name=custom)
 
-    # Affiche les dimensions et un aperçu
-    df_preview = all_dfs[selected_name]
-    st.info(f"📄 `{selected_name}` – {df_preview.shape[0]} lignes × {df_preview.shape[1]} colonnes")
-    st.dataframe(df_preview.head(5), use_container_width=True)
+# ============================================================
+# 📊 Fonctions de filtrage sur les colonnes
+# ============================================================
 
-    # Bouton explicite de validation
-    if st.button("✅ Valider ce fichier"):
-        st.session_state["df"] = df_preview
-        st.success(f"✅ Fichier sélectionné : `{selected_name}`")
-        return df_preview, selected_name
+def get_columns_by_dtype(df: pd.DataFrame, dtype: str = "number") -> list:
+    """
+    Renvoie la liste des colonnes correspondant au type spécifié ('number', 'object', etc.).
+    """
+    return df.select_dtypes(include=dtype).columns.tolist()
 
-    # Ne retourne rien tant que non validé
-    return None, None
+def filter_dataframe_by_column(df: pd.DataFrame, column: str, value):
+    """
+    Filtre le DataFrame sur une valeur précise d'une colonne.
+    """
+    return df[df[column] == value]

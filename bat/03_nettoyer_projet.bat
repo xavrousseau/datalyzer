@@ -2,24 +2,32 @@
 cd ..
 
 echo ========================================
-echo ♻️ NETTOYAGE SÉCURISÉ DU PROJET EDA EXPLORER
+echo ♻️ NETTOYAGE SÉCURISÉ DU PROJET DATALYZER
 echo ========================================
 echo.
 
-:: Étape 1 : Arrêt des services du projet actuel
-echo ⛔ Arrêt des conteneurs Docker de ce projet...
+:: Étape 1 : Arrêt propre des conteneurs liés au projet
+echo ⛔ Arrêt des conteneurs Docker (si actifs)...
 docker-compose down
 
-:: Étape 2 : Suppression des fichiers générés localement
-echo 🧼 Suppression des fichiers générés (data/uploads, data/exports, logs)...
+:: Étape 2 : Suppression sécurisée des dossiers de travail générés
+echo 🧼 Nettoyage des fichiers temporaires :
+set FOLDERS=data\uploads data\exports logs
 
-rmdir /s /q data\uploads
-rmdir /s /q data\exports
-rmdir /s /q logs
+for %%F in (%FOLDERS%) do (
+    if exist %%F (
+        echo - Suppression du dossier : %%F
+        rmdir /s /q %%F
+    ) else (
+        echo - Dossier non trouvé : %%F (déjà nettoyé ?)
+    )
+)
 
+:: Étape 3 : Recréation des dossiers vides pour la relance propre
+echo 🗂️ Recréation des répertoires nécessaires...
 mkdir data\uploads
 mkdir data\exports
 mkdir logs
 
-echo ✅ Nettoyage terminé. Aucun autre projet Docker n’a été impacté.
+echo ✅ Nettoyage terminé. Le projet est prêt pour une nouvelle session.
 pause

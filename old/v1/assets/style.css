@@ -1,0 +1,104 @@
+/* ============================================================================
+   DATALYZER – Thème Zen Japonais 🌸
+   ============================================================================ */
+
+/* ===== Polices et base harmonisée ===== */
+html, body, [class*="css"] {
+    font-family: "Noto Sans JP", "Segoe UI", "Roboto", sans-serif;
+    background-color: #1f1f28;
+    color: #f8f8f2;
+}
+
+/* ===== Titres stylisés ===== */
+h1, h2, h3 {
+    font-weight: 700;
+    color: #ffb3ba;
+    letter-spacing: 0.5px;
+}
+
+/* ===== Boutons ===== */
+.stButton>button {
+    background-color: #e67e7e;
+    color: white;
+    border-radius: 0.5rem;
+    padding: 0.4em 1em;
+    font-weight: 600;
+    border: none;
+    transition: all 0.3s ease-in-out;
+}
+
+.stButton>button:hover {
+    background-color: #d24c4a;
+    transform: scale(1.05);
+}
+
+/* ===== Boutons de téléchargement ===== */
+.stDownloadButton>button {
+    background-color: #28a745;
+    color: white;
+    border-radius: 0.5rem;
+    font-weight: bold;
+}
+
+.stDownloadButton>button:hover {
+    background-color: #218838;
+    transform: scale(1.03);
+}
+
+/* ===== Sidebar + Progression ===== */
+section[data-testid="stSidebar"] {
+    background-color: #2e2e3a;
+    padding: 1rem;
+}
+
+.stProgress > div > div {
+    background-color: #ffb3ba;
+}
+
+/* ===== Containers ===== */
+div[data-testid="stVerticalBlock"] {
+    border-radius: 0.7rem;
+    padding: 1rem;
+    background-color: #2d2d39;
+    margin-bottom: 1rem;
+}
+
+/* ===== Expander et checkbox ===== */
+.st-expander {
+    border: 1px solid #444;
+    border-radius: 0.5rem;
+    background-color: #2e2e3a;
+}
+
+.stCheckbox > label {
+    color: #fff;
+}
+
+/* ===== Code, messages, erreurs ===== */
+code, pre {
+    background-color: #39394a;
+    color: #f9f9f9;
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.stAlert {
+    border-radius: 0.7rem;
+    background-color: #333344 !important;
+}
+
+/* ===== Supprimer footer et hamburger ===== */
+footer, .css-qri22k {
+    display: none;
+}
+
+/* ===== Mobile responsive ===== */
+@media (max-width: 768px) {
+    h1, h2 {
+        font-size: 1.3rem !important;
+    }
+    .stButton>button {
+        font-size: 0.9rem;
+    }
+}

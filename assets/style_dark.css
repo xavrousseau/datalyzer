@@ -1,0 +1,71 @@
+/* ============================================================
+   DATALYZER — Thème Sombre Tokyo Néon
+   ============================================================ */
+
+/* ------ Corps général ------ */
+html, body, [class*="css"] {
+    font-family: 'Noto Sans JP', sans-serif;
+    background-color: #0C0C1D;
+    color: #E0E6F8;
+    font-size: 16px;
+}
+
+/* ------ Sidebar avec fond discret japonais ------ */
+section[data-testid="stSidebar"] {
+    background-image: url("https://www.transparenttextures.com/patterns/wavecut.png");
+    background-color: #14142B;
+    background-size: 200px;
+    background-repeat: repeat;
+    opacity: 0.92;
+}
+
+/* ------ Titres ------ */
+h1, h2, h3 {
+    color: #FF66C4; /* Rose néon doux */
+    font-weight: 700;
+}
+
+/* ------ Textes ------ */
+p, span, div {
+    color: #E0E6F8 !important;
+}
+
+/* ------ Inputs et selectbox ------ */
+input, select, textarea {
+    background-color: #1A1D2E !important;
+    color: white !important;
+    border-radius: 8px;
+    border: 1px solid #555;
+}
+
+/* ------ Boutons ------ */
+.stButton > button {
+    background-color: #5F8CFF;
+    color: white;
+    border-radius: 10px;
+    padding: 0.4rem 0.8rem;
+    font-size: 14px;
+    transition: all 0.2s ease-in-out;
+}
+.stButton > button:hover {
+    background-color: #477BFF;
+    transform: scale(1.05);
+}
+
+/* ------ Progression ------ */
+.stProgress > div > div {
+    background-color: #FF66C4;
+}
+
+/* ------ Containers ------ */
+div[data-testid="stVerticalBlock"] {
+    background-color: #1B1B2D;
+    border-radius: 1rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    padding: 1.5rem;
+}
+
+/* ------ Footer ------ */
+footer, .css-qri22k {
+    display: none;
+}
