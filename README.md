@@ -1,7 +1,3 @@
-Parfait, voici un **README complet et professionnel** pour ton projet **Datalyzer**, en mode 100 % Streamlit, fusionnant intelligemment le fond de ton ancien README avec la structure claire de la nouvelle version. Ce document est conçu pour une présentation sérieuse, claire et réutilisable sur GitHub ou en démo client.
-
----
-
 # 🌸 Datalyzer – Analyse exploratoire et nettoyage intelligent de données
 
 Datalyzer est une application interactive construite avec **Streamlit** pour explorer, nettoyer, analyser et exporter vos données tabulaires (CSV, Excel, etc.). Conçue pour des analyses EDA poussées, elle offre une interface fluide et zen qui guide chaque étape du processus.
