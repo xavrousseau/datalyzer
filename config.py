@@ -1,7 +1,7 @@
 import streamlit as st
 import os
-from datetime import datetime
 
+# Étapes d'analyse EDA avec emoji
 EDA_STEPS = {
     "types": "🧾 Types",
     "missing": "❓ Manquants",
@@ -13,6 +13,7 @@ EDA_STEPS = {
 }
 
 def configure_app():
+    """Initialise la page et applique le style sombre"""
     st.set_page_config(
         page_title="Datalyzer — Analyse exploratoire zen japonais",
         page_icon="🎴",
@@ -20,22 +21,26 @@ def configure_app():
         initial_sidebar_state="expanded"
     )
 
+    # Chargement de la police japonaise
     st.markdown("""
         <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
     """, unsafe_allow_html=True)
 
-    if "theme" not in st.session_state:
-        hour = datetime.now().hour
-        st.session_state.theme = "dark" if hour < 7 or hour > 19 else "light"
-
-    theme_file = {
-        "light": "assets/style_light.css",
-        "dark": "assets/style_dark.css"
-    }.get(st.session_state.theme)
-
-    if theme_file and os.path.exists(theme_file):
-        with open(theme_file, "r", encoding="utf-8") as f:
-            style = f.read()
-            st.markdown(f"<style>{style}</style>", unsafe_allow_html=True)
+    # Application directe du thème sombre
+    dark_theme_path = "assets/style_dark.css"
+    if os.path.exists(dark_theme_path):
+        with open(dark_theme_path, "r", encoding="utf-8") as f:
+            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
     else:
-        st.warning("❗ Le fichier CSS demandé est manquant. Apparence par défaut appliquée.")
+        st.warning("⚠️ Le thème sombre est introuvable. Apparence par défaut utilisée.")
+
+    # Branding visuel dans la sidebar (logo ou torii ?)
+    with st.sidebar:
+        st.markdown(
+            """
+            <div style='text-align: center; padding-bottom: 1rem;'>
+                <img src='https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Torii_gate_icon_red.svg/96px-Torii_gate_icon_red.svg.png' width='48' />
+                <h3 style='margin-top: 0.5rem;'>Datalyzer</h3>
+            </div>
+            """, unsafe_allow_html=True
+        )

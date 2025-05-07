@@ -1,71 +1,136 @@
 /* ============================================================
-   DATALYZER — Thème Clair Zen Japonais Pop
+   DATALYZER — Thème Clair Zen Pro (Épuré et Professionnel)
    ============================================================ */
 
 /* ------ Corps général ------ */
 html, body, [class*="css"] {
     font-family: 'Noto Sans JP', sans-serif;
-    background-color: #FAF8F6; /* Beige pastel */
-    color: #333;
+    background-color: #FAF8F6;
+    color: #2E2E2E;
     font-size: 16px;
+    line-height: 1.6;
 }
 
-/* ------ Sidebar avec fond discret japonais ------ */
+/* ------ Sidebar (fond discret, moins opaque) ------ */
 section[data-testid="stSidebar"] {
-    background-image: url("https://www.transparenttextures.com/patterns/sakura.png");
+    position: relative;
     background-color: #FFF6EC;
+    background-image: url("https://www.transparenttextures.com/patterns/sakura.png");
     background-size: 250px;
     background-repeat: repeat;
-    opacity: 0.95;
+    overflow: hidden;
+}
+section[data-testid="stSidebar"]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-color: #FFF6EC;
+    opacity: 0.04;
+    z-index: 0;
 }
 
-/* ------ Titres ------ */
-h1, h2, h3 {
-    color: #D64545; /* Rouge cerisier doux */
+/* ------ Titres hiérarchisés ------ */
+h1 {
+    font-size: 2rem;
     font-weight: 700;
+    color: #703D3D;
+}
+h2 {
+    font-size: 1.6rem;
+    font-weight: 600;
+    color: #703D3D;
+}
+h3 {
+    font-size: 1.3rem;
+    font-weight: 500;
+    color: #703D3D;
 }
 
 /* ------ Textes ------ */
 p, span, div {
-    color: #333 !important;
+    color: #2E2E2E !important;
 }
 
-/* ------ Inputs et selectbox ------ */
+/* ------ Inputs & Selectbox ------ */
 input, select, textarea {
     background-color: #ffffff !important;
-    color: #222 !important;
+    color: #2E2E2E !important;
     border-radius: 8px;
     border: 1px solid #ccc;
 }
 
 /* ------ Boutons ------ */
 .stButton > button {
-    background-color: #4DB6AC; /* Bleu turquoise pastel */
+    background-color: #4C837A;  /* Vert sauge */
     color: white;
-    border-radius: 10px;
-    padding: 0.4rem 0.8rem;
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
     font-size: 14px;
-    transition: all 0.2s ease-in-out;
+    transition: background-color 0.2s ease-in-out;
+    border: none;
 }
 .stButton > button:hover {
-    background-color: #00897B;
-    transform: scale(1.05);
+    background-color: #3C6F68;
 }
 
-/* ------ Progression ------ */
+/* ------ Barre de progression ------ */
 .stProgress > div > div {
-    background-color: #00ACC1;
+    background-color: #A36A00;
 }
 
 /* ------ Containers ------ */
 div[data-testid="stVerticalBlock"] {
     background-color: #ffffff;
-    border-radius: 1rem;
+    border-radius: 0.75rem;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
     padding: 1.5rem;
+    margin-bottom: 1rem;
 }
 
-/* ------ Footer ------ */
+/* ------ Scrollbar sobre ------ */
+::-webkit-scrollbar {
+    width: 10px;
+}
+::-webkit-scrollbar-thumb {
+    background-color: #D6CFC2;
+    border-radius: 6px;
+}
+
+/* ------ Onglets ------ */
+.stTabs [role="tablist"] {
+    border-bottom: 2px solid #EEE;
+}
+.stTabs [role="tab"] {
+    color: #703D3D;
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+}
+.stTabs [aria-selected="true"] {
+    border-bottom: 3px solid #4C837A;
+    color: #4C837A;
+}
+
+/* ------ Expander ------ */
+details {
+    background-color: #FCFCFC;
+    border: 1px solid #EEE;
+    border-radius: 6px;
+    padding: 0.8rem;
+}
+
+/* ------ Messages Streamlit ------ */
+.stAlert {
+    border-radius: 6px;
+    padding: 1rem;
+}
+.stAlert[data-baseweb="alert"] {
+    box-shadow: none;
+}
+.stAlert > div {
+    font-size: 0.95rem;
+}
+
+/* ------ Footer caché ------ */
 footer, .css-qri22k {
     display: none;
 }
