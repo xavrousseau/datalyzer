@@ -12,11 +12,11 @@ from config import EDA_STEPS
 from utils.snapshot_utils import save_snapshot
 from utils.log_utils import log_action
 from utils.filters import get_active_dataframe, validate_step_button
-from utils.ui_utils import show_header_image_safe, show_icon_header, show_eda_progress
+from utils.ui_utils import show_header_image, show_icon_header, show_eda_progress
 
 def run_suggestions():
     # 🎴 En-tête visuel et contexte
-    show_header_image_safe("bg_night_serenity.png")
+    show_header_image("bg_night_serenity.png")
     show_icon_header("💡", "Suggestions", "Colonnes discrètes à encoder ou texte libre à vectoriser")
     show_eda_progress(EDA_STEPS, st.session_state.get("validation_steps_button", {}))
 

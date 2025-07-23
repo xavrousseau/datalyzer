@@ -11,11 +11,11 @@ import plotly.express as px
 from config import EDA_STEPS
 from utils.eda_utils import compute_cramers_v_matrix, plot_boxplots
 from utils.filters import validate_step_button, get_active_dataframe
-from utils.ui_utils import show_header_image_safe, show_icon_header, show_eda_progress
+from utils.ui_utils import show_header_image, show_icon_header, show_eda_progress
 
 def run_analyse_categorielle():
     # 🎴 En-tête visuel et contexte
-    show_header_image_safe("bg_zen_garden.png")
+    show_header_image("bg_zen_garden.png")
     show_icon_header("📊", "Analyse catégorielle", "Corrélations et croisements avec la variable cible")
     show_eda_progress(EDA_STEPS, st.session_state.get("validation_steps", {}))
 

@@ -11,11 +11,11 @@ import plotly.express as px
 
 from config import EDA_STEPS
 from utils.filters import validate_step_button, get_active_dataframe
-from utils.ui_utils import show_header_image_safe, show_icon_header, show_eda_progress
+from utils.ui_utils import show_header_image, show_icon_header, show_eda_progress
 
 def run_cible():
     # === En-tête visuel ===
-    show_header_image_safe("bg_night_serenity.png")
+    show_header_image("bg_night_serenity.png")
     show_icon_header("🎯", "Analyse cible", "Corrélations, regroupements, visualisation des cibles")
     show_eda_progress(EDA_STEPS, st.session_state.get("validation_steps", {}))
 

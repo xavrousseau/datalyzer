@@ -15,11 +15,11 @@ from utils.eda_utils import detect_constant_columns
 from utils.snapshot_utils import save_snapshot
 from utils.log_utils import log_action
 from utils.filters import get_active_dataframe, validate_step_button
-from utils.ui_utils import show_header_image_safe, show_icon_header, show_eda_progress
+from utils.ui_utils import show_header_image, show_icon_header, show_eda_progress
 
 def run_qualite():
     # Affichage du header et de la progression EDA
-    show_header_image_safe("bg_pagoda_moon.png")
+    show_header_image("bg_pagoda_moon.png")
     show_icon_header("🧪", "Qualité", "Détection de colonnes suspectes, doublons, placeholders, outliers…")
     show_eda_progress(EDA_STEPS, st.session_state.get("validation_steps", {}))
 

@@ -13,11 +13,11 @@ import time
 from utils.snapshot_utils import save_snapshot
 from utils.log_utils import log_action
 from utils.filters import get_active_dataframe
-from utils.ui_utils import show_header_image_safe, show_icon_header, show_footer
+from utils.ui_utils import show_header_image, show_icon_header, show_footer
 
 def run_export():
     # === En-tête visuel ===
-    show_header_image_safe("bg_export_peace.png")
+    show_header_image("bg_export_peace.png")
     show_icon_header("💾", "Export du fichier final",
                      "Choisissez les colonnes, le format et téléchargez votre fichier propre.")
 

@@ -10,11 +10,11 @@ import pandas as pd
 from utils.snapshot_utils import save_snapshot
 from utils.log_utils import log_action
 from utils.filters import validate_step_button
-from utils.ui_utils import show_header_image_safe, show_icon_header
+from utils.ui_utils import show_header_image, show_icon_header
 
 def run_jointures():
     # === En-tête visuel ===
-    show_header_image_safe("bg_temple_sunset.png")
+    show_header_image("bg_temple_sunset.png")
     show_icon_header("🔗", "Jointures intelligentes",
                      "Fusion de fichiers via suggestions ou correspondances manuelles")
 

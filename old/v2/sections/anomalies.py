@@ -13,12 +13,12 @@ from config import EDA_STEPS
 from utils.snapshot_utils import save_snapshot
 from utils.log_utils import log_action
 from utils.filters import get_active_dataframe, validate_step_button  # Import de validate_step_button
-from utils.ui_utils import show_header_image_safe, show_icon_header, show_eda_progress
+from utils.ui_utils import show_header_image, show_icon_header, show_eda_progress
 
 
 def run_anomalies():
     # === En-tête visuel et barre de progression ===
-    show_header_image_safe("bg_moon_trail.png")
+    show_header_image("bg_moon_trail.png")
     show_icon_header("🚨", "Anomalies", "Détection de valeurs extrêmes via Z-score ou IQR")
     show_eda_progress(EDA_STEPS, st.session_state.get("validation_steps", {}))
 

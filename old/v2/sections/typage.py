@@ -12,12 +12,12 @@ from config import EDA_STEPS
 from utils.snapshot_utils import save_snapshot
 from utils.log_utils import log_action
 from utils.filters import get_active_dataframe, validate_step_button
-from utils.ui_utils import show_header_image_safe, show_icon_header, show_eda_progress
+from utils.ui_utils import show_header_image, show_icon_header, show_eda_progress
 
 
 def run_typage():
     # === En-tête visuel et progression ===
-    show_header_image_safe("bg_japanese_room.png")
+    show_header_image("bg_japanese_room.png")
     show_icon_header("🧾", "Typage", "Suggestions automatiques et corrections interactives des types")
     show_eda_progress(EDA_STEPS, st.session_state.get("validation_steps", {}))
 

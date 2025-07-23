@@ -20,12 +20,12 @@ from utils.eda_utils import (
 )
 from utils.log_utils import log_action
 from utils.filters import validate_step_button, get_active_dataframe
-from utils.ui_utils import show_header_image_safe, show_icon_header, show_eda_progress
+from utils.ui_utils import show_header_image, show_icon_header, show_eda_progress
 
 
 def run_exploration():
     # === En-tête général et barre de progression EDA ===
-    show_header_image_safe("bg_sakura_peaceful.png")
+    show_header_image("bg_sakura_peaceful.png")
     show_icon_header("🔍", "Exploration", "Analyse des types, valeurs manquantes, distributions, outliers et corrélations")
     show_eda_progress(EDA_STEPS, st.session_state.get("validation_steps", {}))
 

@@ -16,11 +16,11 @@ from utils.snapshot_utils import (
     delete_snapshot
 )
 from utils.log_utils import log_action
-from utils.ui_utils import show_header_image_safe, show_icon_header, show_footer
+from utils.ui_utils import show_header_image, show_icon_header, show_footer
 
 def run_chargement():
     # === En-tête visuel principal ===
-    show_header_image_safe("bg_upload_file.png")
+    show_header_image("bg_upload_file.png")
     show_icon_header(
         "📂", "Chargement & snapshots",
         "Importez vos fichiers, sélectionnez le fichier actif, gérez les versions sauvegardées."
