@@ -50,7 +50,7 @@ def nav_menu():
     with st.sidebar:
         # --- Image décorative (remplace l'ancien <img src="...">) ---
         st.image(
-            "static/images/sidebars/thumb_manga_flashy.png",
+            "static/images/sidebars/japanese-temple.png",
             width=200,
             caption=None
         )

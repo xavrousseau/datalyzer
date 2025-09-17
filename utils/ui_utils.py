@@ -1,120 +1,193 @@
 # ============================================================
 # Fichier : utils/ui_utils.py
 # Objectif : Fonctions d’interface graphique pour Datalyzer
-# Version : stable, compatible local/docker, thème sombre
-# Auteur : Xavier Rousseau (refonte commentée)
+# Thème : sombre, sobre, accessible ; compatible local/docker
 # ------------------------------------------------------------
 # Points clés :
-# - Affichage image d’en-tête robuste (PIL -> base64) + fallback.
-# - En-têtes (icône + titre) paramétrables (couleurs, tailles, align).
-# - Barre de progression EDA adaptative (colonnes qui se replient).
-# - Footer sobre, accessible, avec date/année et lien GitHub.
-# - Pas de dépendance forte à une palette globale : couleurs passées
-#   en param, avec valeurs par défaut raisonnables.
+# - Bannière robuste (PIL -> base64, cache) avec fallbacks gracieux.
+# - En-tête de section standard (bannière + pré-citation + titre).
+# - En-tête “icone + titre + sous-titre + description”.
+# - Barre de progression EDA compacte et responsive.
+# - Cartes UI cohérentes avec la DA.
+# - Footer épuré avec version, auteur, date et lien.
+# - Rétro-compat : show_header_image_safe() redirige vers show_banner().
 # ============================================================
 
 from __future__ import annotations
 
-import os
 import base64
-from datetime import datetime
-from io import BytesIO
-from typing import Dict, Iterable, Optional
 import html
-import streamlit as st
-from PIL import Image
+from io import BytesIO
+from pathlib import Path
 from textwrap import dedent
+from typing import Dict, Optional, Tuple
+
+from PIL import Image, UnidentifiedImageError
+import streamlit as st
+
+# --- Dépendances config (une seule source de vérité) ---
+# color() : accès tolérant à la palette ; BANNER_SIZE : (w,h) par défaut ;
+# SECTION_BANNERS : mapping section -> chemin d’image ; APP_NAME : nom app.
+from config import color, BANNER_SIZE as BANNER_SIZE_DEFAULT, SECTION_BANNERS, APP_NAME,banner_for, APP_NAME
+ 
 
 
-# =============================== Helpers internes ==============================
+# ======================================================================
+# Utilitaires d'image (privés)
+# ======================================================================
 
-def _to_base64_img(path: str, *, resize_to: tuple[int, int] | None = None) -> str:
+@st.cache_data(show_spinner=False)
+def _encode_image_base64(path: str, size: Optional[Tuple[int, int]] = None) -> Optional[str]:
     """
-    Charge une image et renvoie une data-URL base64 'data:image/<fmt>;base64,...'.
-    Utile pour fiabiliser l’affichage (chemins relatifs parfois capricieux en prod).
-
-    Args:
-        path: chemin local vers l’image.
-        resize_to: (w, h) si redimensionnement souhaité.
-
-    Raises:
-        FileNotFoundError / PIL.UnidentifiedImageError en cas de souci.
+    Charge une image, optionnellement la redimensionne, puis renvoie son contenu encodé en base64 (PNG).
+    Renvoie None si le fichier est introuvable ou illisible.
     """
-    img = Image.open(path)
-    if resize_to:
-        img = img.resize(resize_to)
-    buf = BytesIO()
-    img.save(buf, format="PNG")
-    b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
-    return f"data:image/png;base64,{b64}"
+    p = Path(path)
+    if not p.exists():
+        return None
+    try:
+        img = Image.open(p)
+        if size is not None:
+            # LANCZOS = filtre de redimensionnement haute qualité
+            img = img.resize(size, Image.LANCZOS)
+        buf = BytesIO()
+        img.save(buf, format="PNG")
+        return base64.b64encode(buf.getvalue()).decode("utf-8")
+    except (UnidentifiedImageError, OSError):
+        return None
 
 
-def _centered_html_img(data_url: str, *, height: int | None = None, alt: str = "header") -> str:
-    """
-    Génère un bloc HTML centré contenant une image avec styles doux.
-    """
-    height_attr = f"height='{height}'" if height else ""
-    return (
-        "<div style='display:flex;justify-content:center;margin-bottom:1rem;'>"
-        f"<img src='{data_url}' alt='{alt}' {height_attr} "
-        "style='border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.2);'/>"
-        "</div>"
-    )
+def _section_banner_path(section: Optional[str]) -> Optional[str]:
+    """Retourne un chemin de bannière via config.banner_for() (avec fallback)."""
+    if not section:
+        return None
+    return banner_for(section)
 
 
-# ============================= Image d’en-tête sûre ============================
+# ======================================================================
+# Bannière : affichage robuste avec fallbacks
+# ======================================================================
 
-def show_header_image_safe(
-    relative_path: str,
-    height: int = 220,
-    caption: str | None = None,
+def show_banner(
+    image_path: Optional[str] = None,
     *,
-    resize_to: tuple[int, int] | None = (900, 220),
-) -> bool:
+    section: Optional[str] = None,
+    size: Optional[Tuple[int, int]] = None,
+    alt: Optional[str] = None,
+    center: bool = True,
+    rounded: bool = True,
+    shadow: bool = True,
+) -> None:
     """
-    Affiche une image d’en-tête depuis /static en essayant plusieurs chemins.
-    Retourne True si l'image a été affichée, False sinon.
+    Affiche une bannière encodée en base64 (performant et fiable derrière un reverse proxy).
+    - Priorité à image_path ; sinon déduite via 'section' et SECTION_BANNERS.
+    - Fallbacks : st.image si le fichier existe ; sinon message discret.
 
     Args:
-        relative_path: "images/headers/header.png" ou simplement "header.png".
-        height: hauteur cible CSS (px) pour le rendu.
-        caption: petite légende sous l’image.
-        resize_to: taille pour le redimensionnement côté PIL avant encodage.
-
-    Stratégie de recherche (dans cet ordre) :
-      1) "static/<relative_path>"
-      2) si <relative_path> ne contient pas de '/', on tente aussi :
-         "static/images/headers/<relative_path>"
-
-    Notes :
-      - On privilégie un rendu BASE64 pour éviter les soucis de SERVE de fichiers
-        statiques (notamment en prod / reverse proxy).
-      - En échec, fallback vers st.image avec use_container_width (centré via colonnes).
+        image_path: chemin explicite de l’image à afficher.
+        section: nom logique de la section (clé de SECTION_BANNERS).
+        size: (w, h) ; défaut : BANNER_SIZE_DEFAULT.
+        alt: texte alternatif (accessibilité) ; défaut : "Bannière {APP_NAME}".
+        center: centrer le conteneur.
+        rounded: rayons de bordure doux.
+        shadow: ombre portée légère.
     """
-    candidates: list[str] = [os.path.join("static", relative_path)]
-    if "/" not in relative_path and "\\" not in relative_path:
-        candidates.append(os.path.join("static", "images", "headers", relative_path))
+    path = image_path or _section_banner_path(section)
+    size = size or BANNER_SIZE_DEFAULT
+    alt = alt or f"Bannière {APP_NAME}"
 
-    for path in candidates:
-        if os.path.exists(path):
-            try:
-                data_url = _to_base64_img(path, resize_to=resize_to)
-                st.markdown(_centered_html_img(data_url, height=height), unsafe_allow_html=True)
-                if caption:
-                    st.caption(caption)
-                return True
-            except Exception:
-                # Fallback simple : st.image, centré via colonnes Streamlit
-                col_l, col_c, col_r = st.columns([1, 2, 1])
-                with col_c:
-                    st.image(path, caption=caption, use_container_width=True)
-                return True
+    if path:
+        b64 = _encode_image_base64(path, size)
+        if b64:
+            container_style = []
+            if center:
+                container_style.append("display:flex;justify-content:center;")
+            container_style.append("margin-bottom:1.5rem;")
 
-    st.info("Aucune image d’en-tête trouvée.")
-    return False
+            img_style = []
+            if rounded:
+                img_style.append("border-radius:12px;")
+            if shadow:
+                img_style.append("box-shadow:0 2px 8px rgba(0,0,0,0.2);")
+
+            st.markdown(
+                f"""
+                <div style="{' '.join(container_style)}">
+                  <img src="data:image/png;base64,{b64}" alt="{html.escape(alt)}" style="{' '.join(img_style)}" />
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            return
+
+        # Fallback : fichier existant mais encodage raté → st.image (width auto)
+        if Path(path).exists():
+            st.image(path, caption=None, use_container_width=True)
+            return
+
+    # Fallback final : message discret (pas de stacktrace)
+    st.info("Bannière indisponible (image manquante).")
 
 
-# ================================ En-tête stylé ================================
+# Rétro-compat : certains modules appellent encore cet ancien helper
+def show_header_image_safe(path: str) -> None:
+    """Alias rétro-compat : redirige l’ancien helper vers show_banner()."""
+    show_banner(image_path=path)
+
+
+# ======================================================================
+# En-têtes
+# ======================================================================
+
+def section_header(
+    title: str,
+    subtitle: Optional[str] = None,
+    *,
+    section: Optional[str] = None,
+    banner_path: Optional[str] = None,
+    prequote: Optional[str] = None,
+    emoji: Optional[str] = None,
+    banner_size: Optional[Tuple[int, int]] = None,
+) -> None:
+    """
+    En-tête standard de section : bannière (optionnelle) → pré-citation → titre → sous-titre.
+    Utilise la palette via config.color().
+    """
+    primary = color("primaire", "#8ab4f8")
+    text = color("texte", "#e8eaed")
+    accent = color("accent", "#7bdff2")
+
+    # 1) Bannière (si fournie par section ou chemin explicite)
+    if banner_path or section:
+        show_banner(banner_path, section=section, size=banner_size)
+
+    # 2) Pré-citation (optionnelle)
+    if prequote:
+        st.markdown(
+            f"""
+            <p style="text-align:center;font-style:italic;font-size:14px;color:{accent};margin:0 0 1rem 0;">
+              {html.escape(prequote)}
+            </p>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    # 3) Titre + sous-titre
+    prefix = f"{emoji} " if emoji else ""
+    st.markdown(
+        f"""
+        <h1 style="color:{primary};margin-bottom:.5rem;">{prefix}{html.escape(title)}</h1>
+        """,
+        unsafe_allow_html=True,
+    )
+    if subtitle:
+        st.markdown(
+            f"""
+            <p style="font-size:16px;color:{text};margin-top:0;">{html.escape(subtitle)}</p>
+            """,
+            unsafe_allow_html=True,
+        )
+
 
 def show_icon_header(
     icon: str,
@@ -124,37 +197,27 @@ def show_icon_header(
     *,
     title_size: str = "1.8rem",
     align: str = "center",
-    color_title: str = "#FF6D99",
-    color_subtitle: str = "#AAAAAA",
-    color_description: str = "#BBBBBB",
+    color_title: str | None = None,
+    color_subtitle: str | None = None,
+    color_description: str | None = None,
     max_width_ch: int = 70,
 ) -> None:
     """
-    Affiche un bloc en-tête : icône + titre + sous-titre + description.
-
-    Args:
-        icon: emoji/icone (ex: "📂").
-        title: titre principal.
-        subtitle: sous-titre court (optionnel).
-        description: paragraphe explicatif (optionnel).
-        title_size: taille CSS du titre (ex: '2rem').
-        align: 'left' | 'center' | 'right'.
-        color_title: couleur du titre.
-        color_subtitle: couleur du sous-titre.
-        color_description: couleur du paragraphe.
-        max_width_ch: largeur max du paragraphe en "ch" (caractères).
+    En-tête “icône + titre + sous-titre + description” (pratique pour des pages simples).
     """
     align = align if align in {"left", "center", "right"} else "center"
+    color_title = color_title or color("primaire", "#FF6D99")
+    color_subtitle = color_subtitle or color("accent", "#AAAAAA")
+    color_description = color_description or color("texte", "#BBBBBB")
 
     subtitle_html = (
-        f"<p style='font-size:1rem;color:{color_subtitle};margin:.2rem 0 .6rem 0;'>"
-        f"{subtitle}</p>"
+        f"<p style='font-size:1rem;color:{color_subtitle};margin:.2rem 0 .6rem 0;'>{html.escape(subtitle)}</p>"
         if subtitle
         else ""
     )
     desc_html = (
         f"<p style='font-size:.95rem;color:{color_description};margin:0;max-width:{max_width_ch}ch;display:inline-block;'>"
-        f"{description}</p>"
+        f"{html.escape(description)}</p>"
         if description
         else ""
     )
@@ -162,9 +225,9 @@ def show_icon_header(
     st.markdown(
         f"""
         <div style="text-align:{align};margin-bottom:1.5rem;">
-          <div style="font-size:2rem;line-height:1;margin-bottom:.25rem;">{icon}</div>
+          <div style="font-size:2rem;line-height:1;margin-bottom:.25rem;">{html.escape(icon)}</div>
           <h1 style="font-size:{title_size};font-weight:700;color:{color_title};margin:.1rem 0 .4rem 0;">
-            {title}
+            {html.escape(title)}
           </h1>
           {subtitle_html}
           {desc_html}
@@ -174,7 +237,36 @@ def show_icon_header(
     )
 
 
-# ============================= Progression des étapes ==========================
+# ======================================================================
+# Cartes & Progression
+# ======================================================================
+
+def ui_card(title: str, content_html: str, *, min_height_px: int = 280) -> None:
+    """
+    Carte neutre et réutilisable. Le contenu est en HTML (listes, paragraphes).
+    """
+    bg = color("fond_section", "#111418")
+    txt = color("texte", "#e8eaed")
+    sec = color("secondaire", "#8ab4f8")
+
+    st.markdown(
+        f"""
+        <div role="region" aria-label="{html.escape(title)}"
+             style="
+                background-color:{bg};
+                border-radius:10px;
+                padding:1.2rem;
+                min-height:{min_height_px}px;
+                box-shadow:0 1px 6px rgba(0,0,0,0.06);
+                color:{txt};
+             ">
+            <h4 style="color:{sec};margin-top:0;">{html.escape(title)}</h4>
+            <div style="line-height:1.55;font-size:14.5px;">{content_html}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
 
 def show_eda_progress(
     steps_dict: Dict[str, str],
@@ -184,26 +276,36 @@ def show_eda_progress(
     compact: bool = True,
     single_row: bool = True,
 ) -> float:
+    """
+    Affiche une progression d’étapes EDA.
+    - compact=True : barre + pastilles ; sinon st.progress classique.
+    - single_row=True : les pastilles défilent horizontalement ; sinon elles se replient.
+    Renvoie le ratio [0,1].
+    """
     status = status_dict or st.session_state.get("validation_steps", {}) or {}
-    total  = len(steps_dict)
-    done   = sum(bool(status.get(code, False)) for code in steps_dict)
-    ratio  = (done / total) if total else 0.0
+    total = len(steps_dict)
+    done = sum(bool(status.get(code, False)) for code in steps_dict)
+    ratio = (done / total) if total else 0.0
     percent = int(ratio * 100)
 
     st.markdown(f"### {html.escape(title)}")
 
     if compact:
-        bar_html = dedent(f"""
-        <div style="margin:.3rem 0 .8rem 0;">
-          <div style="height:8px;background:#2b2f3a;border-radius:8px;overflow:hidden;">
-            <div style="height:8px;width:{percent}%;background:#7bd88f;"></div>
-          </div>
-          <div style="font-size:.9rem;color:#9aa0a6;margin-top:.3rem;">
-            Progression : {done}/{total} ({percent}%)
-          </div>
-        </div>
-        """).strip()
-        st.markdown(bar_html, unsafe_allow_html=True)
+        bar_bg = color("fond_section", "#2b2f3a")
+        bar_fg = "#7bd88f"
+        st.markdown(
+            dedent(f"""
+            <div style="margin:.3rem 0 .8rem 0;">
+              <div style="height:8px;background:{bar_bg};border-radius:8px;overflow:hidden;">
+                <div style="height:8px;width:{percent}%;background:{bar_fg};"></div>
+              </div>
+              <div style="font-size:.9rem;color:#9aa0a6;margin-top:.3rem;">
+                Progression : {done}/{total} ({percent}%)
+              </div>
+            </div>
+            """).strip(),
+            unsafe_allow_html=True,
+        )
     else:
         st.progress(ratio)
 
@@ -217,63 +319,62 @@ def show_eda_progress(
     cards = []
     for code, label in steps_dict.items():
         label_safe = html.escape(str(label))
-        done_flag  = bool(status.get(code, False))
-        icon  = "✅" if done_flag else "⏳"
-        color = "#7bd88f" if done_flag else "#a0a0a0"
-        cards.append(dedent(f"""
-        <div style="
-          flex:0 0 auto;display:flex;align-items:center;gap:.6rem;
-          padding:.7rem .95rem;margin:.35rem;background:rgba(17,17,17,.20);
-          border:1px solid #333;border-radius:.9rem;white-space:nowrap;">
-          <span style="color:{color};font-size:1.05rem;">{icon}</span>
-          <span style="color:#e6e6e6;">{label_safe}</span>
+        done_flag = bool(status.get(code, False))
+        icon = "✅" if done_flag else "⏳"
+        color_fg = "#7bd88f" if done_flag else "#a0a0a0"
+        cards.append(
+            dedent(f"""
+            <div style="
+              flex:0 0 auto;display:flex;align-items:center;gap:.6rem;
+              padding:.7rem .95rem;margin:.35rem;background:rgba(17,17,17,.20);
+              border:1px solid #333;border-radius:.9rem;white-space:nowrap;">
+              <span style="color:{color_fg};font-size:1.05rem;">{icon}</span>
+              <span style="color:#e6e6e6;">{label_safe}</span>
+            </div>
+            """).strip()
+        )
+
+    st.markdown(
+        dedent(f"""
+        <div style="display:flex;flex-wrap:{wrap};gap:.25rem;overflow-x:{overflow_x};
+                    padding:.2rem .1rem .4rem .1rem;scrollbar-width:thin;">
+          {''.join(cards)}
         </div>
-        """).strip())
-
-    container_html = dedent(f"""
-    <div style="display:flex;flex-wrap:{wrap};gap:.25rem;overflow-x:{overflow_x};
-                padding:.2rem .1rem .4rem .1rem;scrollbar-width:thin;">
-      {''.join(cards)}
-    </div>
-    <div style="font-size:.85rem;color:#9aa0a6;margin-top:.2rem;">
-      Légende : <span style="color:#7bd88f;">✅ terminé</span> · <span style="#a0a0a0;">⏳ en attente</span>
-    </div>
-    """).strip()
-
-    st.markdown(container_html, unsafe_allow_html=True)
+        <div style="font-size:.85rem;color:#9aa0a6;margin-top:.2rem;">
+          Légende : <span style="color:#7bd88f;">✅ terminé</span> · <span style="color:#a0a0a0;">⏳ en attente</span>
+        </div>
+        """).strip(),
+        unsafe_allow_html=True,
+    )
     return ratio
 
 
-# =================================== Footer ===================================
+# ======================================================================
+# Footer
+# ======================================================================
 
 def show_footer(
     author: str = "Xavier Rousseau",
-    github: str = "xsorouz",
+    site_url: str = "https://xavrousseau.github.io/",
     version: str = "1.0",
     *,
     show_date: bool = True,
 ) -> None:
     """
-    Affiche un footer sobre avec auteur, version, date et lien GitHub.
-
-    Args:
-        author: nom affiché.
-        github: handle GitHub (profile/org).
-        version: version de l’app.
-        show_date: afficher la date du jour.
+    Footer sobre avec auteur, version, date et lien externe.
     """
+    from datetime import datetime
+
     st.markdown("---")
     today = datetime.today().strftime("%Y-%m-%d") if show_date else ""
     year = datetime.today().strftime("%Y")
-
     date_part = f" — {today}" if today else ""
+
     st.markdown(
         f"""
         <div style="text-align:center;font-size:.9rem;color:#888;margin-top:1rem;">
-          © {year} · Datalyzer v{version} — {author}{date_part}
-          • <a href="https://github.com/{github}" target="_blank" rel="noopener noreferrer">
-              github.com/{github}
-            </a>
+          © {year} · Datalyzer v{html.escape(version)} — {html.escape(author)}{date_part}
+          • <a href="{html.escape(site_url)}" target="_blank" rel="noopener noreferrer">{html.escape(site_url)}</a>
         </div>
         """,
         unsafe_allow_html=True,

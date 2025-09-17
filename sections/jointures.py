@@ -2,85 +2,75 @@
 # Fichier : sections/jointures.py
 # Objectif : Fusion intelligente de fichiers avec suggestions
 #            et indicateurs de couverture (version Datalyzer)
-# Notes :
-#  - Aucune modification de utils/filters.py nécessaire.
+# Auteur : Xavier Rousseau
+# ------------------------------------------------------------
+# Notes d'implémentation :
 #  - Aligne automatiquement les types de clés (cast str si besoin).
-#  - Nettoie le nom d’export/snapshot pour éviter les caractères gênants.
-#  - Evite les OOM : suggestions via uniques échantillonnés (bornes).
+#  - Nettoie le nom d’export/snapshot (safe filename).
+#  - Suggestions bornées (colonnes/uniques) pour rester réactif.
+#  - UI unifiée : section_header() + show_footer()
+#  - Indicateurs fiables via `merge(..., indicator=True)`.
 # ============================================================
 
 from __future__ import annotations
 
-import base64
 import re
-from io import BytesIO
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import pandas as pd
 import streamlit as st
-from PIL import Image
 
 from utils.snapshot_utils import save_snapshot
 from utils.log_utils import log_action
 from utils.filters import validate_step_button
-from utils.ui_utils import show_icon_header
+from utils.ui_utils import section_header, show_footer
 
 
 # =============================== Constantes ===================================
 
-# Limites pour calcul des suggestions (contrôle mémoire/temps)
-# - on borne le nombre d'unqiues par colonne (par ex. grosses ID)
-# - on borne le nombre de colonnes testées pour éviter O(n^2) trop lourd
-SUGGEST_MAX_UNIQUES = 50_000         # au-delà, on échantillonne
-SUGGEST_SAMPLE_UNIQUES = 15_000      # taille d'échantillon de uniques
-SUGGEST_MAX_COLS_PER_SIDE = 30       # si table avec 200 colonnes…
-SUGGEST_MIN_COVERAGE = 10.0          # seuil de "couverture minimale" (%) pour afficher
-
-# Aperçu jointure : n lignes pour l’aperçu visuel
-PREVIEW_ROWS = 10
-
-
-# =============================== Header visuel =================================
-
-def _render_header_image() -> None:
-    """
-    Affiche une bannière en-tête centrée, avec fallback informatif en cas d'absence.
-    Conserve l'approche base64 (style custom) pour éviter les chemins statiques relatifs
-    cassés en prod (CDN) — alternative simple : st.image(..., use_container_width=True).
-    """
-    image_path = "static/images/headers/header_waves_blossoms.png"  # ⚠️ vérifie l’orthographe du fichier
-    try:
-        img = Image.open(image_path).resize((900, 220))
-        buffer = BytesIO()
-        img.save(buffer, format="PNG")
-        base64_img = base64.b64encode(buffer.getvalue()).decode("utf-8")
-
-        st.markdown(
-            f"""
-            <div style='display:flex;justify-content:center;margin-bottom:1.5rem;'>
-              <img src="data:image/png;base64,{base64_img}" alt="Bannière Datalyzer"
-                   style="border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.2);" />
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    except Exception as e:
-        # On informe sans bloquer l'app (image décorative)
-        st.info("Aucune image d’en-tête trouvée.")
-        st.caption(f"(Détail : {e})")
+# Limites pour calcul des suggestions (contrôle mémoire/temps).
+# Idée : on borne le nombre d'unqiues et de colonnes scannées pour éviter
+# les OOM et conserver une UI réactive sur des fichiers larges.
+SUGGEST_MAX_UNIQUES: int = 50_000        # au-delà, on échantillonne
+SUGGEST_SAMPLE_UNIQUES: int = 15_000     # taille d’échantillon de uniques
+SUGGEST_MAX_COLS_PER_SIDE: int = 30      # si table avec 200 colonnes…
+SUGGEST_MIN_COVERAGE: float = 10.0       # seuil (%) pour afficher une suggestion
+PREVIEW_ROWS: int = 10                   # lignes d’aperçu post-jointure
 
 
 # =============================== Helpers ======================================
 
 def _sanitize_filename(name: str) -> str:
-    """Nom de fichier sûr (alphanumérique + _ -)."""
+    """
+    Produit un nom de fichier « sûr » : alphanumérique + '_' + '-'.
+
+    Paramètres
+    ----------
+    name : str
+        Base proposée par l'utilisateur (peut être vide).
+
+    Retour
+    ------
+    str
+        Nom nettoyé, par défaut "fusion" si tout est vide/invalidé.
+
+    Pourquoi :
+    ----------
+    Évite les caractères problématiques selon l'OS et les FS (espaces,
+    ponctuation exotique, etc.) pour les téléchargements et snapshots.
+    """
     name = (name or "").strip()
     name = re.sub(r"[^\w\-]+", "_", name)
     return name.strip("_") or "fusion"
 
 
 def _stem(fname: str) -> str:
-    """Racine de nom de fichier sans extension (utile pour suffixes)."""
+    """
+    Renvoie la racine d'un nom de fichier (sans extension).
+
+    Utile pour générer des suffixes de colonnes post-merge.
+    Gère des extensions simples (1 à 5 caractères).
+    """
     return re.sub(r"\.[A-Za-z0-9]{1,5}$", "", fname)
 
 
@@ -91,9 +81,24 @@ def _align_key_types(
     right_on: Sequence[str],
 ) -> Tuple[pd.DataFrame, pd.DataFrame, List[Tuple[str, str, str]]]:
     """
-    Aligne les dtypes des clés de jointure. Stratégie simple et sûre :
-    - si divergence, cast en string des deux côtés.
-    Retourne (df_left_aligned, df_right_aligned, diagnostics).
+    Aligne les dtypes des colonnes clés avant la jointure.
+
+    Stratégie :
+      - Si divergence de dtype entre `lcol` et `rcol`, cast des DEUX côtés en str.
+      - Enregistre un diagnostic lisible pour l'UI (expander).
+
+    Paramètres
+    ----------
+    df_left, df_right : pd.DataFrame
+        DataFrames de gauche et de droite.
+    left_on, right_on : list[str]
+        Listes alignées de colonnes clés.
+
+    Retour
+    ------
+    (dl, dr, diagnostics)
+        dl, dr sont des copies modifiées et `diagnostics` liste des tuples
+        (col_gauche, col_droite, message).
     """
     dl, dr = df_left.copy(), df_right.copy()
     diagnostics: List[Tuple[str, str, str]] = []
@@ -108,8 +113,17 @@ def _align_key_types(
 
 def _cap_uniques(values: pd.Series) -> pd.Series:
     """
-    Retourne une série des valeurs uniques, échantillonnée si trop volumineuse.
-    Conserve la nature 'object' / 'string' / 'int'… mais on travaille par comparaison d'égalité.
+    Renvoie les valeurs uniques d'une série, échantillonnées si trop volumineuses.
+
+    Pourquoi :
+      - Calculer |∩|, |∪| et les métriques associées peut exploser en mémoire
+        si on garde tous les uniques sur de très grosses colonnes (IDs).
+      - On échantillonne de façon déterministe (random_state=42).
+
+    Retour
+    ------
+    pd.Series
+        Série des uniques (complète ou échantillonnée).
     """
     uniq = pd.Series(pd.unique(values.dropna()))
     if uniq.size > SUGGEST_MAX_UNIQUES:
@@ -119,10 +133,22 @@ def _cap_uniques(values: pd.Series) -> pd.Series:
 
 def _coverage_metrics(left_vals: pd.Series, right_vals: pd.Series) -> Tuple[float, float, int, int, int]:
     """
-    Calcule des métriques de recouvrement entre deux ensembles de valeurs uniques.
-    - coverage_min (%): |∩| / min(|L|, |R|) * 100
-    - jaccard (%):      |∩| / |∪| * 100
-    Retourne (coverage_min, jaccard, nL, nR, nI)
+    Calcule des métriques de recouvrement entre deux colonnes candidates.
+
+    Définitions
+    -----------
+    coverage_min (%) = |intersection| / min(|L|, |R|) * 100
+      → Mesure la "couverture" minimale si on joignait sur cette paire.
+
+    jaccard (%) = |intersection| / |union| * 100
+      → Mesure la similarité globale des ensembles.
+
+    Retour
+    ------
+    (coverage_min, jaccard, nL, nR, nI)
+      coverage_min, jaccard arrondis à 0.1 près.
+      nL, nR = tailles des ensembles uniques (après éventuel cap).
+      nI = taille de l'intersection.
     """
     set_l = set(_cap_uniques(left_vals).tolist())
     set_r = set(_cap_uniques(right_vals).tolist())
@@ -137,20 +163,30 @@ def _coverage_metrics(left_vals: pd.Series, right_vals: pd.Series) -> Tuple[floa
 
 def _suggest_matches(df_left: pd.DataFrame, df_right: pd.DataFrame) -> Optional[pd.DataFrame]:
     """
-    Cherche des paires de colonnes candidates à la jointure par recouvrement d’éléments.
-    Renvoie un DataFrame trié (coverage_min desc, puis jaccard), ou None si rien.
-    Bornes : on limite le nombre de colonnes explorées pour la réactivité.
+    Propose des paires de colonnes candidates pour la jointure,
+    en se basant sur le recouvrement (coverage_min + jaccard).
+
+    Heuristique & Bornes
+    --------------------
+    - On limite à `SUGGEST_MAX_COLS_PER_SIDE` colonnes par DataFrame.
+    - On tolère dtype object des deux côtés (IDs hétérogènes fréquents).
+    - On n'affiche que les suggestions au-delà de `SUGGEST_MIN_COVERAGE`.
+
+    Retour
+    ------
+    pd.DataFrame | None
+        Un tableau trié par "Couverture min (%)" desc puis "Jaccard (%)",
+        ou None si aucune suggestion pertinente.
     """
-    # Colonnes candidates : on prend d'abord les colonnes non trop exotiques
     cols_left = df_left.columns.tolist()[:SUGGEST_MAX_COLS_PER_SIDE]
     cols_right = df_right.columns.tolist()[:SUGGEST_MAX_COLS_PER_SIDE]
 
     suggestions: List[Tuple[str, str, float, float, int, int, int]] = []
     for lcol in cols_left:
         for rcol in cols_right:
-            # Heuristique : on ne compare que si types proches ou si strings (souvent des IDs)
             lt, rt = df_left[lcol].dtype, df_right[rcol].dtype
-            if (lt == rt) or (lt == "object") or (rt == "object"):
+            # On tolère les colonnes object (IDs hétérogènes fréquents).
+            if (lt == rt) or pd.api.types.is_object_dtype(lt) or pd.api.types.is_object_dtype(rt):
                 cov, jac, nL, nR, nI = _coverage_metrics(df_left[lcol], df_right[rcol])
                 if cov >= SUGGEST_MIN_COVERAGE:
                     suggestions.append((lcol, rcol, cov, jac, nL, nR, nI))
@@ -169,59 +205,50 @@ def _suggest_matches(df_left: pd.DataFrame, df_right: pd.DataFrame) -> Optional[
     return df_suggest.sort_values(
         by=["Couverture min (%)", "Jaccard (%)"],
         ascending=False,
-        kind="mergesort",  # stable
+        kind="mergesort",  # stable pour égalités
     ).reset_index(drop=True)
-
-
-def _post_merge_coverage(
-    merged: pd.DataFrame, left_on: Sequence[str], right_on: Sequence[str], how: str
-) -> Dict[str, int]:
-    """
-    Calcule des indicateurs simples de couverture après jointure.
-    - lignes appariées vs non appariées selon 'how'
-    Utilise des indicateurs d’existance de clés côté gauche/droite.
-    """
-    # On construit des flags "match_gauche/droite" via présence de toutes les clés
-    left_key_present = merged[left_on].notna().all(axis=1)
-    right_key_present = merged[right_on].notna().all(axis=1)
-
-    matched = int((left_key_present & right_key_present).sum())
-    only_left = int((left_key_present & ~right_key_present).sum())
-    only_right = int((~left_key_present & right_key_present).sum())  # valable pour 'right'/'outer'
-    total = int(merged.shape[0])
-
-    return {
-        "total": total,
-        "appariees": matched,
-        "gauche_seules": only_left if how in {"left", "outer"} else 0,
-        "droite_seules": only_right if how in {"right", "outer"} else 0,
-    }
 
 
 # =============================== Vue principale ================================
 
 def run_jointures() -> None:
     """
-    Page "Jointures intelligentes" :
-      - Sélection de 2 fichiers chargés (gauche/droite)
-      - Suggestions de paires de colonnes (coverage_min + jaccard)
-      - Sélection manuelle de clés (multi-colonnes)
-      - Jointure (inner/left/right/outer) + indicateurs de couverture
-      - Snapshot et téléchargement CSV
+    Affiche la page « Jointures intelligentes ».
+
+    Parcours utilisateur :
+      1) Sélectionner deux fichiers déjà chargés (gauche/droite).
+      2) Consulter les suggestions automatiques (coverage_min + jaccard).
+      3) Choisir manuellement les colonnes clés (clés composites possibles).
+      4) Lancer la jointure (inner/left/right/outer).
+      5) Visualiser les indicateurs de couverture via `_merge`.
+      6) Sauvegarder un snapshot + télécharger le CSV résultant.
+
+    Dépendances attendues :
+      - `st.session_state["dfs"]` : dict[str, pd.DataFrame] des fichiers chargés.
+      - `utils.ui_utils.section_header(...)` : en-tête unifié.
+      - `utils.filters.validate_step_button(...)` : validation de l'étape.
+      - `utils.snapshot_utils.save_snapshot(df, suffix=...)` : snapshot.
+      - `utils.log_utils.log_action(event, details)` : traçabilité.
+
+    Accessibilité :
+      - Les blocs d'explication utilisent des titres clairs et des captions.
+      - Les tableaux sont rendus via `st.dataframe` (navigation clavier).
     """
-    # --- En-tête visuel ---
-    _render_header_image()
-    show_icon_header(
-        "🔗", "Jointures intelligentes",
-        "Fusionnez deux fichiers via suggestions ou sélection manuelle des clés."
+    # ---------- En-tête unifié ----------
+    section_header(
+        title="Jointures intelligentes",
+        subtitle="Fusionnez deux fichiers via suggestions ou sélection manuelle des clés.",
+        section="jointures",     # → image depuis config.SECTION_BANNERS["jointures"]
+        emoji="🔗",
     )
 
-    # --- Vérification des fichiers préalablement chargés ---
+    # ---------- Vérification des fichiers ----------
     dfs = st.session_state.get("dfs", {})
     if not dfs or len(dfs) < 2:
         st.warning("📁 Importez au moins deux fichiers via l’onglet **Chargement**.")
         return
 
+    # Sélection gauche/droite
     fichiers = list(dfs.keys())
     fichier_gauche = st.selectbox("📌 Fichier principal (gauche)", fichiers, key="join_left")
     fichiers_droite = [f for f in fichiers if f != fichier_gauche]
@@ -230,7 +257,7 @@ def run_jointures() -> None:
     df_left = dfs[fichier_gauche]
     df_right = dfs[fichier_droit]
 
-    # --- Aperçu des colonnes disponibles ---
+    # ---------- Aperçu rapide des colonnes ----------
     st.markdown("### 🧩 Colonnes disponibles")
     c1, c2 = st.columns(2)
     with c1:
@@ -242,7 +269,7 @@ def run_jointures() -> None:
 
     st.divider()
 
-    # --- Suggestions automatiques (bornées et triées) ---
+    # ---------- Suggestions automatiques ----------
     st.markdown("### 🤖 Suggestions automatiques de jointure")
     df_suggest = _suggest_matches(df_left, df_right)
     if df_suggest is not None:
@@ -256,7 +283,7 @@ def run_jointures() -> None:
 
     st.divider()
 
-    # --- Sélection manuelle des clés ---
+    # ---------- Sélection manuelle des clés ----------
     st.markdown("### 🛠️ Sélection manuelle des colonnes à joindre")
     left_on = st.multiselect(
         "🔑 Clés du fichier gauche", df_left.columns.tolist(),
@@ -267,7 +294,7 @@ def run_jointures() -> None:
         key="right_on", help="Le nombre de colonnes doit correspondre à gauche."
     )
 
-    # Affiche des stats rapides de recouvrement pour les paires choisies
+    # Affiche des stats rapides pour la sélection courante
     if left_on and right_on and len(left_on) == len(right_on):
         st.markdown("### 📊 Statistiques de correspondance (sélection)")
         rows = []
@@ -288,8 +315,12 @@ def run_jointures() -> None:
         type_jointure = st.radio(
             "⚙️ Type de jointure", ["inner", "left", "right", "outer"],
             horizontal=True, index=1,  # left par défaut
-            help="Choisissez 'inner' pour ne garder que les correspondances exactes, "
-                 "'left' pour conserver toutes les lignes du fichier principal, etc."
+            help=(
+                "Choisissez 'inner' pour ne garder que les correspondances exactes ; "
+                "'left' pour conserver toutes les lignes du fichier principal ; "
+                "'right' pour conserver toutes les lignes du fichier joint ; "
+                "'outer' pour conserver toutes les lignes des deux fichiers."
+            ),
         )
         default_name = _sanitize_filename(f"fusion_{_stem(fichier_gauche)}_{_stem(fichier_droit)}")
         nom_fusion = _sanitize_filename(st.text_input("💾 Nom du fichier fusionné", value=default_name))
@@ -299,16 +330,19 @@ def run_jointures() -> None:
         if do_merge:
             try:
                 with st.spinner("Fusion en cours…"):
-                    # Harmoniser les types de clés
-                    df_left_aligned, df_right_aligned, diag = _align_key_types(df_left, df_right, left_on, right_on)
+                    # 1) Harmoniser les types de clés (diagnostic affichable)
+                    df_left_aligned, df_right_aligned, diag = _align_key_types(
+                        df_left, df_right, left_on, right_on
+                    )
                     if diag:
                         with st.expander("ℹ️ Alignement de types appliqué", expanded=False):
                             for lcol, rcol, msg in diag:
                                 st.write(f"- `{lcol}` ↔ `{rcol}` : {msg}")
 
-                    # Suffixe auto basé sur le nom du fichier droit (sans extension)
+                    # 2) Suffixe basé sur le nom du fichier droit (sans extension)
                     right_suffix = f"_{_stem(fichier_droit)}"
 
+                    # 3) Merge avec indicateur de provenance pour métriques fiables
                     fusion = df_left_aligned.merge(
                         df_right_aligned,
                         left_on=list(left_on),
@@ -317,26 +351,35 @@ def run_jointures() -> None:
                         suffixes=("", right_suffix),
                         copy=False,
                         sort=False,
+                        indicator=True,  # ← nécessaire pour récupérer _merge
                     )
 
-                # Indicateurs de couverture post-jointure
-                cov_stats = _post_merge_coverage(fusion, left_on, right_on, type_jointure)
+                # 4) Indicateurs de couverture via colonne `_merge`
+                vc = fusion["_merge"].value_counts(dropna=False)
+                matched = int(vc.get("both", 0))
+                only_left = int(vc.get("left_only", 0))
+                only_right = int(vc.get("right_only", 0))
+                total = int(len(fusion))
+
+                # Nettoyage : retirer `_merge` du rendu final
+                fusion = fusion.drop(columns=["_merge"])
+
                 st.success(
                     f"✅ Jointure réussie : {fusion.shape[0]} lignes × {fusion.shape[1]} colonnes "
-                    f"(appariées : {cov_stats['appariees']}, "
-                    f"gauche seules : {cov_stats['gauche_seules']}, "
-                    f"droite seules : {cov_stats['droite_seules']})."
+                    f"(appariées : {matched}, "
+                    f"gauche seules : {only_left if type_jointure in {'left','outer'} else 0}, "
+                    f"droite seules : {only_right if type_jointure in {'right','outer'} else 0})."
                 )
 
-                # Mémoriser + snapshot
+                # 5) Mémoriser + snapshot + log
                 st.session_state.setdefault("dfs", {})
                 st.session_state["dfs"][f"{nom_fusion}.csv"] = fusion
                 st.session_state["df"] = fusion
 
-                save_snapshot(fusion, label=nom_fusion)
+                save_snapshot(fusion, suffix=nom_fusion)  # cohérent avec la section fichiers
                 log_action("jointure", f"{type_jointure} entre {fichier_gauche} et {fichier_droit} → {nom_fusion}")
 
-                # Aperçu & téléchargement
+                # 6) Aperçu & téléchargement
                 with st.expander("🔍 Aperçu du résultat", expanded=True):
                     st.dataframe(fusion.head(PREVIEW_ROWS), use_container_width=True)
 
@@ -348,14 +391,25 @@ def run_jointures() -> None:
                 )
 
             except Exception as e:
+                # Message volontairement concis ; le détail peut être logué côté serveur
                 st.error(f"❌ Erreur lors de la jointure : {e}")
     else:
+        # Guide l'utilisateur vers la condition d'activation :
+        # même nombre de colonnes entre gauche et droite.
         st.info("💡 Sélectionnez un nombre **égal** de clés dans les deux fichiers pour activer la jointure.")
 
-    # --- Validation d’étape (signature inchangée de filters.validate_step_button) ---
+    # ---------- Validation d’étape ----------
+    # Permet de marquer la progression utilisateur dans le workflow.
     if "df" in st.session_state and isinstance(st.session_state["df"], pd.DataFrame):
         validate_step_button(
             "jointures",
             label="✅ Valider l’étape",
             context_prefix="jointr_",
         )
+
+    # ---------- Footer ----------
+    show_footer(
+        author="Xavier Rousseau",
+        site_url="https://xavrousseau.github.io/",
+        version="1.0",
+    )

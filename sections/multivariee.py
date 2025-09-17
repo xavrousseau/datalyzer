@@ -1,181 +1,294 @@
 # ============================================================
-# Fichier : multivariee.py
-# Objectif : ACP, clustering, projection, boxplots, Cramér’s V
-# Statut : Module avancé (hors barre de progression EDA)
-# Points forts :
-#   - Imputation douce (moyenne) + standardisation
-#   - Index conservé pour recoller aux données d’origine
-#   - Couleur : Cluster OU une colonne catégorielle (optionnelle)
-#   - Garde-fous NaN / dimensions / perf (downsample pour le scatter)
+# Fichier : sections/multivariee.py
+# Objectif : Analyses multivariées interactives (PCA & K-means)
+# Version  : UI unifiée + étapes EDA + snapshots & logs
+# Auteur   : Xavier Rousseau
 # ============================================================
+
+from __future__ import annotations
 
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
+from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
+from utils.steps import EDA_STEPS
 from utils.snapshot_utils import save_snapshot
-from utils.eda_utils import compute_cramers_v_matrix, plot_boxplots
 from utils.log_utils import log_action
-from utils.filters import get_active_dataframe
-from utils.ui_utils import show_header_image_safe, show_icon_header
+from utils.filters import get_active_dataframe, validate_step_button
+from utils.ui_utils import section_header, show_eda_progress, show_footer
 
-# ------------------------------ Helpers ------------------------------
 
-def _safe_numeric_matrix(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
-    """Convertit -> numeric, puis impute par la moyenne (imputation douce)."""
-    X = df[cols].apply(pd.to_numeric, errors="coerce")
-    # si une colonne est full-NaN, on la droppe (KMeans/PCA ne tolèrent pas ça)
-    full_nan = [c for c in X.columns if X[c].isna().all()]
-    if full_nan:
-        X = X.drop(columns=full_nan)
-    # imputation moyenne
-    X = X.fillna(X.mean(numeric_only=True))
-    return X
+# =============================== Helpers internes ==============================
 
-def _downsample(df: pd.DataFrame, n: int = 10000) -> pd.DataFrame:
-    """Évite d’envoyer trop de points au scatter (perf UI)."""
-    if len(df) <= n:
-        return df
-    return df.sample(n, random_state=42)
+def _select_numeric(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Retourne un sous-DataFrame numérique (float/int) sans NA (listwise),
+    pour un usage simple avec PCA/K-means.
 
-# ------------------------------ Page ------------------------------
+    Remarque :
+      - On effectue un dropna() pour la clarté pédagogique. Pour de très
+        grands datasets, envisager une imputation en amont dans une autre page.
+    """
+    num = df.select_dtypes(include=["number"]).copy()
+    return num.dropna(axis=0, how="any")
 
-def run_multivariee():
-    # En-tête graphique et pédagogique
-    show_header_image_safe("bg_sakura_river.png")
-    show_icon_header("📊", "Analyse multivariée", "ACP, clustering, boxplots et corrélations catégorielles")
 
-    # 🔁 Fichier actif
+def _standardize(X: pd.DataFrame, with_mean: bool = True, with_std: bool = True) -> tuple[pd.DataFrame, StandardScaler]:
+    """
+    Standardise les colonnes (Z-score) via StandardScaler (sklearn).
+
+    Retour :
+      - X_std : DataFrame standardisé avec mêmes index/colonnes
+      - scaler : objet StandardScaler pour inversions/exports éventuels
+    """
+    scaler = StandardScaler(with_mean=with_mean, with_std=with_std)
+    Z = scaler.fit_transform(X.values)
+    X_std = pd.DataFrame(Z, index=X.index, columns=X.columns)
+    return X_std, scaler
+
+
+def _fit_pca(X: pd.DataFrame, n_components: int) -> tuple[PCA, pd.DataFrame, pd.Series, pd.Series]:
+    """
+    Ajuste une PCA et renvoie :
+      - pca          : modèle PCA sklearn
+      - scores (DF)  : projections (composantes principales)
+      - exp_var (%)  : variance expliquée par composante (en %)
+      - cum_exp_var (%): cumul de variance expliquée (en %)
+    """
+    pca = PCA(n_components=n_components, random_state=42)
+    T = pca.fit_transform(X.values)
+    cols = [f"PC{i+1}" for i in range(n_components)]
+    scores = pd.DataFrame(T, index=X.index, columns=cols)
+    exp = pd.Series(pca.explained_variance_ratio_ * 100, index=cols, name="Explained Var (%)")
+    cum = exp.cumsum().rename("Cumulative (%)")
+    return pca, scores, exp, cum
+
+
+def _fit_kmeans(X: pd.DataFrame, k: int, n_init: int = "auto", random_state: int = 42) -> tuple[KMeans, np.ndarray, float]:
+    """
+    Ajuste un K-means et retourne :
+      - modèle KMeans
+      - labels (np.ndarray)
+      - silhouette (float) si calculable, sinon NaN
+    """
+    km = KMeans(n_clusters=k, n_init=n_init, random_state=random_state)
+    labels = km.fit_predict(X.values)
+    sil = float("nan")
+    # silhouette_score nécessite au moins 2 clusters non vides
+    try:
+        if len(set(labels)) > 1:
+            sil = float(silhouette_score(X.values, labels))
+    except Exception:
+        pass
+    return km, labels, sil
+
+
+# ================================== Vue =======================================
+
+def run_multivariee() -> None:
+    """
+    Page « Analyses multivariées » :
+
+    Modules :
+      - PCA (Analyse en Composantes Principales)
+        * Standardisation optionnelle
+        * Choix du nombre de composantes
+        * Scree plot (variance expliquée) + cumul
+        * Projection 2D/3D + (mini) biplot chargeings
+      - K-means
+        * Clustering sur l’espace standardisé OU sur l’espace PCA
+        * Évaluation silhouette, sauvegarde des clusters
+
+    Effets :
+      - Les projections et labels sont ajoutés au DataFrame actif (colonnes 'PC*' et 'cluster_k').
+      - Des snapshots sont créés pour tracer l’historique.
+      - Les actions sont loguées.
+    """
+    # ---------- En-tête + barre compacte ----------
+    section_header(
+        title="Multivariée",
+        subtitle="PCA pour réduire la dimension et K-means pour regrouper les observations.",
+        section="analyse",
+        emoji="🧩",
+    )
+    show_eda_progress(EDA_STEPS, compact=True, single_row=True)
+
+    # ---------- DataFrame actif ----------
     df, nom = get_active_dataframe()
     if df is None or df.empty:
-        st.warning("❌ Aucun fichier actif ou fichier vide. Sélectionnez un fichier dans l’onglet Fichiers.")
+        st.warning("❌ Aucun fichier actif. Importez un fichier via **Chargement**.")
         return
 
-    # 📈 Préparation des colonnes
-    numeric_cols = df.select_dtypes(include="number").columns.tolist()
-    if len(numeric_cols) < 2:
-        st.error("❌ Il faut au moins deux variables numériques pour faire une ACP.")
+    # ---------- Sélection des variables & options globales ----------
+    st.markdown("### 🔧 Préparation des données")
+    numeric_df = df.select_dtypes(include=["number"])
+    if numeric_df.empty:
+        st.error("❌ Aucune colonne numérique disponible pour l’analyse multivariée.")
         return
 
-    # Paramètres de l’analyse
-    st.markdown("### ⚙️ Paramètres ACP")
-    c1, c2 = st.columns(2)
-    n_max = min(len(numeric_cols), 6)
-    n_components = c1.slider("📉 Nombre de composantes", min_value=2, max_value=n_max, value=2, step=1)
-    do_clustering = c2.checkbox("🤖 Activer le clustering post-ACP")
-
-    # Matrice numérique (imputation + standardisation)
-    X = _safe_numeric_matrix(df, numeric_cols)
-    if X.shape[1] < 2:
-        st.error("❌ Après nettoyage (NaN / colonnes vides), il reste < 2 colonnes numériques.")
-        return
-
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-
-    # ⚙️ ACP
-    pca = PCA(n_components=n_components)
-    X_pca = pca.fit_transform(X_scaled)
-
-    # DataFrame ACP : conserver l’index d’origine pour aligner avec df
-    df_pca = pd.DataFrame(X_pca, index=df.index, columns=[f"PC{i+1}" for i in range(n_components)])
-
-    # 📊 Variance expliquée
-    st.markdown("### 🎯 Variance expliquée")
-    explained_var = pca.explained_variance_ratio_
-    var_df = pd.DataFrame({
-        "Composante": [f"PC{i+1}" for i in range(n_components)],
-        "Variance (%)": explained_var * 100,
-        "Variance cumulée (%)": np.cumsum(explained_var) * 100
-    })
-    fig_var = px.bar(
-        var_df, x="Composante", y="Variance (%)",
-        title="Variance expliquée par composante",
-        text_auto=".1f"
-    )
-    st.plotly_chart(fig_var, use_container_width=True)
-    st.caption(f"Variance cumulée (PC1→PC{n_components}) : **{var_df['Variance cumulée (%)'].iloc[-1]:.1f}%**")
-
-    # 🤖 Clustering KMeans (optionnel)
-    if do_clustering:
-        st.markdown("### 🤖 Clustering KMeans (post-ACP)")
-        n_clusters = st.slider("Nombre de clusters", min_value=2, max_value=10, value=3, step=1)
-        km = KMeans(n_clusters=n_clusters, n_init=10, random_state=42)
-        labels = km.fit_predict(X_pca)
-        df_pca["Cluster"] = pd.Series(labels, index=df_pca.index, dtype="int64")
-        st.success(f"✅ Clustering KMeans effectué ({n_clusters} clusters).")
-        log_action("clustering", f"{n_clusters} clusters sur ACP ({n_components} PCs)")
-
-        # Silhouette (défini pour n_clusters >= 2)
-        try:
-            sil = silhouette_score(X_pca, labels)
-            st.info(f"Score de silhouette : **{sil:.3f}**")
-        except Exception as e:
-            st.warning(f"Silhouette non calculable : {e}")
-
-        if st.button("💾 Sauvegarder ACP + Clusters"):
-            save_snapshot(df_pca, suffix="acp_clusters")
-            st.success("✅ Snapshot ACP + Clusters sauvegardé.")
-
-    # 🌐 Projection 2D (PC1 vs PC2)
-    st.markdown("### 🌐 Projection des composantes principales (PC1 vs PC2)")
-    if n_components < 2:
-        st.info("Ajoutez une deuxième composante pour projeter en 2D.")
-    else:
-        # Options de couleur : aucun, Cluster (si dispo), ou une variable catégorielle de df
-        cat_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
-        color_opts = ["(Aucune)"]
-        if "Cluster" in df_pca.columns:
-            color_opts.append("Cluster")
-        color_opts += cat_cols
-
-        color_choice = st.selectbox("🎨 Colorier par :", options=color_opts, index=0)
-
-        plot_df = df_pca[["PC1", "PC2"]].copy()
-        color_series = None
-        if color_choice == "Cluster":
-            color_series = df_pca["Cluster"]
-        elif color_choice != "(Aucune)" and color_choice in df.columns:
-            # on aligne par index pour éviter tout décalage
-            color_series = df[color_choice].reindex(plot_df.index)
-
-        plot_df = _downsample(plot_df.join(color_series, how="left") if color_series is not None else plot_df, n=10000)
-
-        fig_proj = px.scatter(
-            plot_df,
-            x="PC1", y="PC2",
-            color=color_series.name if color_series is not None else None,
-            title="Projection ACP (PC1 vs PC2)",
-            labels={"PC1": "Composante 1", "PC2": "Composante 2"}
+    with st.expander("Sélection des variables (numériques)", expanded=True):
+        cols_selected = st.multiselect(
+            "Variables à inclure",
+            options=numeric_df.columns.tolist(),
+            default=numeric_df.columns.tolist(),
+            help="Retirez les variables hors-sujet ou redondantes avant la PCA/K-means."
         )
+
+    if not cols_selected:
+        st.info("Sélectionnez au moins une variable.")
+        return
+
+    # Prétraitement simple : sous-ensemble + dropna
+    X_raw = df[cols_selected].copy()
+    X = _select_numeric(X_raw)  # dropna listwise
+    dropped = len(X_raw) - len(X)
+    if dropped:
+        st.caption(f"ℹ️ {dropped} ligne(s) supprimée(s) pour valeurs manquantes sur les variables retenues.")
+
+    # ============================== PCA =======================================
+    st.markdown("## 📉 PCA — Réduction de dimension")
+
+    col_std1, col_std2 = st.columns(2)
+    with col_std1:
+        do_standardize = st.checkbox("Standardiser (Z-score)", value=True, help="Recommandé si les échelles diffèrent.")
+    with col_std2:
+        n_comp = st.slider("Nombre de composantes", min_value=2, max_value=min(10, len(cols_selected)), value=2)
+
+    X_std, scaler = _standardize(X) if do_standardize else (X.copy(), None)
+    pca, scores, exp, cum = _fit_pca(X_std, n_components=n_comp)
+
+    # Scree plot (variance expliquée)
+    scree_df = pd.DataFrame({"Composante": exp.index, "Var (%)": exp.values, "Cumul (%)": cum.values})
+    fig_scree = px.bar(scree_df, x="Composante", y="Var (%)", title="Scree plot — Variance expliquée par composante")
+    fig_scree.add_scatter(x=scree_df["Composante"], y=scree_df["Cumul (%)"], mode="lines+markers", name="Cumul (%)")
+    st.plotly_chart(fig_scree, use_container_width=True)
+    st.caption(f"Total expliqué par {n_comp} composantes : **{cum.iloc[-1]:.2f}%**")
+
+    # Projection 2D/3D
+    st.markdown("### 🎯 Projection")
+    proj_mode = st.radio("Espace de projection", ["2D", "3D"], horizontal=True)
+    color_by = st.selectbox("Couleur par", options=["Aucune"] + df.columns.tolist(), index=0)
+
+    proj_df = scores.copy()
+    proj_df.index.name = "index"
+    if color_by != "Aucune":
+        proj_df[color_by] = df.loc[proj_df.index, color_by]
+
+    if proj_mode == "2D":
+        fig_proj = px.scatter(
+            proj_df, x="PC1", y="PC2",
+            color=None if color_by == "Aucune" else color_by,
+            hover_data=[proj_df.index],
+            title="Projection PCA (PC1 vs PC2)"
+        )
+    else:
+        if "PC3" not in proj_df.columns:
+            st.info("ℹ️ Au moins 3 composantes nécessaires pour la projection 3D.")
+            fig_proj = None
+        else:
+            fig_proj = px.scatter_3d(
+                proj_df, x="PC1", y="PC2", z="PC3",
+                color=None if color_by == "Aucune" else color_by,
+                hover_data=[proj_df.index],
+                title="Projection PCA (PC1 vs PC2 vs PC3)"
+            )
+    if fig_proj is not None:
         st.plotly_chart(fig_proj, use_container_width=True)
 
-    # 📦 Boxplots Numérique ↔ Catégories
-    st.markdown("### 🧮 Boxplots Numérique ↔ Catégories")
-    cat_cols_all = df.select_dtypes(include=["object", "category"]).columns.tolist()
-    if len(numeric_cols) and len(cat_cols_all):
-        col_num = st.selectbox("🔢 Variable numérique", numeric_cols, key="mv_box_num")
-        col_cat = st.selectbox("📁 Variable catégorielle", cat_cols_all, key="mv_box_cat")
-        st.plotly_chart(plot_boxplots(df, col_num, col_cat), use_container_width=True)
-    else:
-        st.info("❗ Aucune combinaison Num ↔ Catégories disponible.")
+    # (Mini) biplot : charges des variables sur PC1/PC2
+    with st.expander("📎 Biplot (charges variables sur PC1/PC2)", expanded=False):
+        if n_comp >= 2:
+            loadings = pd.DataFrame(
+                pca.components_[:2, :].T,
+                index=cols_selected,
+                columns=["PC1", "PC2"],
+            )
+            fig_load = px.scatter(loadings, x="PC1", y="PC2", text=loadings.index, title="Charges (PC1/PC2)")
+            fig_load.update_traces(textposition="top center")
+            st.plotly_chart(fig_load, use_container_width=True)
+            st.caption("Les charges indiquent la contribution directionnelle des variables aux composantes.")
+        else:
+            st.info("ℹ️ Biplot indisponible avec moins de 2 composantes.")
 
-    # 📈 Corrélations catégorielles (Cramér’s V)
-    st.markdown("### 📈 Corrélations catégorielles (Cramér’s V)")
-    if len(cat_cols_all) >= 2:
-        cramers_df = compute_cramers_v_matrix(df[cat_cols_all])
-        st.dataframe(cramers_df.style.background_gradient(cmap="Blues"), use_container_width=True)
-    else:
-        st.info("❗ Pas assez de variables catégorielles pour calculer Cramér’s V.")
+    # Sauvegarde éventuelle des scores dans le DF actif
+    if st.checkbox("➕ Ajouter les scores PCA au DataFrame actif", value=False):
+        for c in scores.columns:
+            df.loc[scores.index, c] = scores[c]
+        st.session_state["df"] = df
+        save_snapshot(df, suffix=f"pca_{n_comp}c")
+        log_action("pca_add_scores", f"{n_comp} composantes ajoutées")
+        st.success("✅ Scores PCA ajoutés au DataFrame actif.")
 
-    # 📤 Export ACP seule (sans clusters)
-    with st.expander("📤 Exporter les scores ACP (PCs)"):
-        if st.button("💾 Snapshot des composantes (PCs)"):
-            save_snapshot(df_pca.drop(columns=["Cluster"], errors="ignore"), suffix="acp_scores")
-            st.success("✅ Snapshot des composantes sauvegardé.")
- 
+    st.divider()
+
+    # ============================== K-MEANS ====================================
+    st.markdown("## 🧭 K-means — Regroupements")
+
+    use_space = st.radio(
+        "Espace de clustering",
+        ["Données standardisées", "Scores PCA"],
+        horizontal=True,
+        help="Le clustering sur les scores PCA peut réduire le bruit et accélérer."
+    )
+    k = st.slider("Nombre de clusters (k)", min_value=2, max_value=10, value=3)
+
+    # Espace choisi
+    if use_space == "Données standardisées":
+        X_cluster = X_std
+        space_label = "std"
+    else:
+        X_cluster = scores  # n_comp colonnes
+        space_label = f"pca{n_comp}"
+
+    # Ajustement K-means
+    if st.button("🚀 Lancer le clustering K-means"):
+        try:
+            km, labels, sil = _fit_kmeans(X_cluster, k=k)
+            st.success(f"✅ Clustering terminé. Silhouette = {sil:.3f}" if np.isfinite(sil) else "✅ Clustering terminé.")
+
+            # Ajouter les labels au DF actif (alignement sur index de X_cluster)
+            label_col = f"cluster_k{k}_{space_label}"
+            df.loc[X_cluster.index, label_col] = labels
+            st.session_state["df"] = df
+
+            # Visualisation dans l’espace choisi
+            if use_space == "Scores PCA":
+                vis_df = scores.copy()
+            else:
+                # Si pas de PCA, on projette rapidement en 2D via PCA pour visualisation
+                _, vis_scores, _, _ = _fit_pca(X_std, n_components=min(2, X_std.shape[1]))
+                vis_df = vis_scores.copy()
+
+            vis_df[label_col] = pd.Series(labels, index=X_cluster.index)
+            fig_clusters = px.scatter(
+                vis_df,
+                x=vis_df.columns[0], y=vis_df.columns[1],
+                color=label_col,
+                hover_data=[vis_df.index],
+                title=f"Clusters K={k} ({'PCA' if use_space=='Scores PCA' else 'PCA(2) pour visualisation'})"
+            )
+            st.plotly_chart(fig_clusters, use_container_width=True)
+
+            # Sauvegarde
+            save_snapshot(df.loc[X_cluster.index, [label_col]], suffix=label_col)
+            log_action("kmeans_fit", f"k={k} on {space_label}, silhouette={sil:.3f}")
+        except Exception as e:
+            st.error(f"❌ Erreur K-means : {e}")
+
+    st.divider()
+
+    # ---------- Validation étape EDA ----------
+    # Choix : on valide une étape dédiée 'multivariate' (si présente dans EDA_STEPS)
+    validate_step_button("multivariate", context_prefix="multi_")
+
+    # ---------- Footer ----------
+    show_footer(
+        author="Xavier Rousseau",
+        site_url="https://xavrousseau.github.io/",
+        version="1.0",
+    )
