@@ -1,23 +1,39 @@
+# =============================================================================
+# Datalyzer — Dockerfile.streamlit (simple et pédagogique)
+# Objectif : construire une image Streamlit fonctionnelle sans fioritures
+# =============================================================================
+
+# Image de base légère
 FROM python:3.10-slim
 
-# Répertoire de travail dans le conteneur
+# Répertoire de travail
 WORKDIR /app
 
-# On suppose que tu as un requirements.txt à la racine
-COPY requirements.txt .
+# (Optionnel) Dépendances système — laisse commenté si tout marche.
+# Utile si certaines libs Python (pandas/pyarrow/openpyxl) exigent des paquets OS.
+# RUN apt-get update && apt-get install -y --no-install-recommends \
+#     build-essential \
+#     libatlas-base-dev \
+#     && rm -rf /var/lib/apt/lists/*
 
-# Installation des dépendances Python
+# Variables d’environnement (qualité de vie)
+ENV PYTHONDONTWRITEBYTECODE=1 \ 
+    PYTHONUNBUFFERED=1
+
+# Dépendances Python — étape séparée pour profiter du cache Docker
+COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copie tout le code du projet
+# Copie du projet (code + assets + static + data structure)
 COPY . /app
 
-# Création des dossiers nécessaires
+# Dossiers utiles (au cas où ils n’existent pas côté image)
+# En local, tes volumes (./data -> /app/data, etc.) écraseront ce contenu ce qui est normal.
 RUN mkdir -p /app/data/uploads /app/data/exports /app/logs
 
-# Port exposé pour Streamlit
+# Port Streamlit
 EXPOSE 8501
 
-# Commande de démarrage
-CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+# Lancement — chemin ABSOLU pour éviter toute ambiguïté
+CMD ["streamlit", "run", "/app/app.py", "--server.port=8501", "--server.address=0.0.0.0"]

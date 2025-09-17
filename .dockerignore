@@ -1,11 +1,59 @@
+# =============================================================================
+# .dockerignore — Datalyzer
+# Objectif : réduire la taille des builds Docker et accélérer la copie
+#            en excluant tout ce qui n’est pas nécessaire à l’image.
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# 1) Cache Python et fichiers temporaires
+# ---------------------------------------------------------------------------
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+
+# Logs et fichiers runtime
 *.log
+*.pid
+*.db
+
+# ---------------------------------------------------------------------------
+# 2) Données locales (on monte /app/data via volumes, inutile en image)
+# ---------------------------------------------------------------------------
+data/uploads/
+data/exports/
+logs/
+
+# Fichiers de travail / résultats d’analyse
 *.sqlite3
 *.parquet
 *.csv
-.env
-.venv
+
+# ---------------------------------------------------------------------------
+# 3) Environnements et config machine locale
+# ---------------------------------------------------------------------------
+.env                # ton fichier d’environnement local (jamais dans l’image)
+.venv/              # environnement virtuel Python local
+env/                # parfois utilisé
+venv/               # idem
+
+# ---------------------------------------------------------------------------
+# 4) Notebooks / checkpoints
+# ---------------------------------------------------------------------------
 .ipynb_checkpoints/
+*.ipynb
+
+# ---------------------------------------------------------------------------
+# 5) Système / versionnement
+# ---------------------------------------------------------------------------
+.git/
+.gitignore
+.gitattributes
+
+# ---------------------------------------------------------------------------
+# 6) Autres fichiers lourds ou non pertinents
+# ---------------------------------------------------------------------------
+.DS_Store           # macOS
+Thumbs.db           # Windows
+*.bak               # sauvegardes
+*.swp               # fichiers swap Vim

@@ -1,130 +1,155 @@
 # ============================================================
 # Fichier : qualite.py
 # Objectif : Évaluation de la qualité des données (score + anomalies)
-# Version enrichie avec corrections automatiques et validation
+# Version : unifiée (utilise utils.eda_utils), barre compacte, étape EDA "stats"
 # ============================================================
 
-import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-from scipy.stats import zscore
+import streamlit as st
 
-from config import EDA_STEPS
-from utils.eda_utils import detect_constant_columns
+from utils.steps import EDA_STEPS
+from utils.eda_utils import (
+    detect_constant_columns,
+    detect_low_variance_columns,        # dispo si tu veux l'ajouter aux règles
+    get_columns_above_threshold,
+    detect_outliers,
+)
 from utils.snapshot_utils import save_snapshot
 from utils.log_utils import log_action
-from utils.filters import get_active_dataframe, validate_step_button
-from utils.ui_utils import show_header_image_safe, show_icon_header, show_eda_progress
+from utils.filters import get_active_dataframe
+from utils.ui_utils import show_header_image_safe, show_icon_header
+
 
 def run_qualite():
-    # Affichage du header et de la progression EDA
+    # === En-tête + barre de progression ======================
     show_header_image_safe("bg_pagoda_moon.png")
     show_icon_header("🧪", "Qualité", "Détection de colonnes suspectes, doublons, placeholders, outliers…")
-    show_eda_progress(EDA_STEPS, st.session_state.get("validation_steps", {}))
 
-    # 🔁 Chargement du fichier actif
+    # === DataFrame actif =====================================
     df, nom = get_active_dataframe()
     if df is None or df.empty:
-        st.warning("❌ Aucun fichier actif ou fichier vide. Merci de sélectionner un fichier valide dans l’onglet Fichiers.")
+        st.warning("❌ Aucun fichier actif ou fichier vide. Sélectionne un fichier dans l’onglet Fichiers.")
         return
 
-    # 🌸 Score global de qualité
+    # === Score global (simple et explicite) ==================
     st.markdown("### 🌸 Score global de qualité")
-    na_penalty = df.isna().mean().mean() * 40
-    dup_penalty = 20 if df.duplicated().any() else 0
-    const_penalty = (df.nunique() <= 1).sum() / df.shape[1] * 40
+    na_penalty   = df.isna().mean().mean() * 40                     # pénalise les NA moyens
+    dup_penalty  = 20 if df.duplicated().any() else 0               # pénalise s'il y a des doublons
+    const_penalty= (df.nunique() <= 1).sum() / max(1, df.shape[1]) * 40
     score = max(0, int(100 - (na_penalty + dup_penalty + const_penalty)))
     st.subheader(f"🌟 **{score} / 100**")
     st.divider()
 
-    # 🧾 Résumé des anomalies
+    # === Résumé des anomalies clés ===========================
     st.markdown("### 🧾 Résumé des anomalies")
-    nb_const = (df.nunique() <= 1).sum()
-    nb_na50 = (df.isna().mean() > 0.5).sum()
-    nb_dup = df.duplicated().sum()
+    nb_const = int((df.nunique() <= 1).sum())
+    nb_na50  = int((df.isna().mean() > 0.5).sum())
+    nb_dup   = int(df.duplicated().sum())
 
-    st.markdown(f"""
-    - 🔁 **{nb_dup} lignes dupliquées**  
-    - 🟨 **{nb_na50} colonnes avec >50% de NA**  
-    - 🧊 **{nb_const} colonnes constantes**
-    """)
+    st.markdown(
+        f"- 🔁 **{nb_dup} lignes dupliquées**  \n"
+        f"- 🟨 **{nb_na50} colonnes avec >50% de NA**  \n"
+        f"- 🧊 **{nb_const} colonnes constantes**"
+    )
     st.divider()
 
-    # 📊 Heatmap NA
+    # === Heatmap NA (optionnelle) ============================
     if st.checkbox("📊 Afficher la heatmap des NA"):
-        fig = px.imshow(df.isna(), aspect="auto", color_continuous_scale="Blues", title="Carte des valeurs manquantes")
-        st.plotly_chart(fig)
+        fig = px.imshow(
+            df.isna(),
+            aspect="auto",
+            color_continuous_scale="Blues",
+            title="Carte des valeurs manquantes",
+        )
+        st.plotly_chart(fig, use_container_width=True)
     st.divider()
 
-    # 🩺 Vérifications supplémentaires
+    # === Vérifications supplémentaires =======================
     st.markdown("### 🩺 Vérifications supplémentaires")
 
-    # Colonnes numériques suspectes stockées en tant qu'objets
+    # Colonnes 'object' qui semblent numériques
     suspect_numeric_as_str = [
-        col for col in df.select_dtypes(include="object")
-        if df[col].str.replace(".", "", regex=False).str.replace(",", "", regex=False).str.isnumeric().mean() > 0.8
+        col for col in df.select_dtypes(include="object").columns
+        if df[col].astype(str).str.replace(".", "", regex=False).str.replace(",", "", regex=False).str.isnumeric().mean() > 0.8
     ]
     if suspect_numeric_as_str:
         st.warning("🔢 Colonnes `object` contenant majoritairement des chiffres :")
         st.code(", ".join(suspect_numeric_as_str))
 
+    # Noms de colonnes suspects
     suspect_names = [col for col in df.columns if col.startswith("Unnamed") or "id" in col.lower()]
     if suspect_names:
         st.warning("📛 Noms de colonnes suspects :")
         st.code(", ".join(suspect_names))
 
-    placeholder_values = ["unknown", "n/a", "na", "undefined", "none", "missing", "?"]
+    # Valeurs placeholders communes
+    placeholder_values = {"unknown", "n/a", "na", "undefined", "none", "missing", "?"}
     placeholder_hits = {
-        col: df[col].astype(str).str.lower().isin(placeholder_values).sum()
+        col: int(df[col].astype(str).str.lower().isin(placeholder_values).sum())
         for col in df.columns
-        if df[col].astype(str).str.lower().isin(placeholder_values).sum() > 0
     }
+    placeholder_hits = {k: v for k, v in placeholder_hits.items() if v > 0}
     if placeholder_hits:
         st.warning("❓ Valeurs placeholders détectées :")
         st.dataframe(pd.DataFrame.from_dict(placeholder_hits, orient="index", columns=["Occurrences"]))
 
     st.divider()
 
-    # 📉 Outliers via Z-score
-    st.markdown("### 📉 Valeurs extrêmes (Z-score > 3)")
-    z_outliers = {
-        col: (np.abs(zscore(df[col].dropna())) > 3).sum()
-        for col in df.select_dtypes(include="number").columns
-        if df[col].dropna().std() != 0
-    }
-    z_outliers = {k: v for k, v in z_outliers.items() if v > 0}
-    if z_outliers:
-        st.warning("🚨 Outliers détectés :")
-        st.dataframe(pd.DataFrame.from_dict(z_outliers, orient="index", columns=["Nb outliers"]))
-    else:
-        st.success("✅ Aucun outlier détecté.")
-    st.divider()
-
-    # 🧊 Colonnes constantes
-    const_cols = detect_constant_columns(df)
-    if const_cols:
-        st.warning(f"⚠️ Colonnes constantes détectées ({len(const_cols)}) :")
-        st.code(", ".join(const_cols))
-    st.divider()
-
-    # 🧼 Correction automatique
-    st.markdown("### 🧼 Correction automatique des colonnes problématiques")
-    if st.button("Corriger maintenant"):
+    # === Outliers (détection commune) ========================
+    st.markdown("### 📉 Valeurs extrêmes (Z-score > 3, méthode commune)")
+    num_cols = df.select_dtypes(include="number").columns.tolist()
+    out_counts = {}
+    for col in num_cols:
+        s = df[col].dropna()
+        if s.empty or s.std(ddof=0) == 0:
+            continue
         try:
-            to_drop = df.columns[(df.nunique() <= 1) | (df.isna().mean() > 0.5)].tolist()
-            st.markdown(f"### Colonnes à supprimer :")
-            st.code(", ".join(to_drop))
-            if st.button("Confirmer la suppression"):
-                df.drop(columns=to_drop, inplace=True)
-                st.session_state.df = df
-                save_snapshot(df, suffix="qualite_cleaned")
-                log_action("qualite_auto_fix", f"{len(to_drop)} colonnes supprimées")
-                st.success(f"✅ Correction appliquée : {len(to_drop)} colonnes supprimées.")
+            out_idx_or_df = detect_outliers(df[[col]], method="zscore", threshold=3.0)
+            if isinstance(out_idx_or_df, pd.DataFrame):
+                out_counts[col] = int(out_idx_or_df.shape[0])
+            else:  # Index ou liste d’index
+                out_counts[col] = int(len(out_idx_or_df))
+        except Exception:
+            # En cas d’erreur inattendue sur une colonne, on l’ignore dans ce résumé
+            continue
+
+    if out_counts:
+        st.warning("🚨 Outliers détectés :")
+        st.dataframe(pd.DataFrame.from_dict(out_counts, orient="index", columns=["Nb outliers"]))
+    else:
+        st.success("✅ Aucun outlier détecté avec cette règle globale.")
+    st.divider()
+
+    # === Colonnes problématiques identifiées =================
+    st.markdown("### 🧊 Colonnes constantes & >50% NA")
+    const_cols = detect_constant_columns(df)
+    na_cols    = get_columns_above_threshold(df, 0.5)   # 50% NA
+    if const_cols or na_cols:
+        st.warning(f"⚠️ Colonnes candidates à suppression ({len(set(const_cols) | set(na_cols))}) :")
+        st.code(", ".join(sorted(set(const_cols) | set(na_cols))))
+    else:
+        st.info("Rien à signaler selon ces règles simples.")
+    st.divider()
+
+    # === Correction automatique (règles claires) =============
+    st.markdown("### 🧼 Correction automatique des colonnes problématiques")
+    if st.button("Corriger maintenant", key="qual_fix"):
+        try:
+            to_drop = sorted(set(const_cols) | set(na_cols))
+            if not to_drop:
+                st.info("Aucune colonne à supprimer selon les règles (constantes ou >50% NA).")
+            else:
+                st.markdown("### Colonnes à supprimer :")
+                st.code(", ".join(to_drop))
+                if st.button("Confirmer la suppression", key="qual_fix_confirm"):
+                    df.drop(columns=to_drop, inplace=True, errors="ignore")
+                    st.session_state.df = df
+                    save_snapshot(df, suffix="qualite_cleaned")
+                    log_action("qualite_auto_fix", f"{len(to_drop)} colonnes supprimées")
+                    st.success(f"✅ Correction appliquée : {len(to_drop)} colonnes supprimées.")
         except Exception as e:
             st.error(f"❌ Erreur pendant la correction : {e}")
 
     st.divider()
-
-    # ✅ Validation de l'étape
-    validate_step_button("qualite")  # Remplacer validate_step par validate_step_button

@@ -12,15 +12,21 @@ ydata-profiling>=4.0
 
 # === Visualisation complémentaire ===
 matplotlib>=3.7
+seaborn>=0.12        # (optionnel mais souvent utilisé)
 
 # === Lecture & export multi-format ===
-openpyxl>=3.1       # Pour Excel (.xlsx)
-pyarrow>=14.0       # Pour Parquet (.parquet)
-python-snappy>=0.6  # Compression parquet Snappy (optionnel mais conseillé)
+openpyxl>=3.1        # Excel (.xlsx)
+pyarrow>=14.0        # Parquet (.parquet)
+python-snappy>=0.6   # Compression parquet Snappy
+xlsxwriter>=3.1      # Optionnel, Excel stylé
+# fastparquet>=2023.8 # Optionnel si tu veux l’alternative à pyarrow
+
+# === Images & UI ===
+Pillow>=10.0         # Pour chargement/redimensionnement d’images
 
 # === Suivi, logs et ressources système ===
 loguru>=0.7
-psutil>=5.9         # Pour surveiller la mémoire ou CPU (utile pour snapshots)
+psutil>=5.9          # Pour surveiller mémoire/CPU
 
-# === Optionnel (pour meilleure compatibilité Pandas et export Excel stylé) ===
-xlsxwriter>=3.1
+# === Divers (utiles dans data science) ===
+tqdm>=4.65           # Barres de progression (optionnel)

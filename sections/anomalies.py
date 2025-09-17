@@ -1,93 +1,136 @@
 # ============================================================
 # Fichier : anomalies.py
 # Objectif : Détection d’outliers (Z-score / IQR) par variable
-# Version refactorée avec améliorations UX et options supplémentaires
+# Version : alignée avec utils.eda_utils, barre compacte et étape EDA "extremes"
 # ============================================================
 
-import streamlit as st
-import pandas as pd
+import os
 import numpy as np
+import pandas as pd
 import plotly.express as px
+import streamlit as st
 
-from config import EDA_STEPS
+from utils.steps import EDA_STEPS
 from utils.snapshot_utils import save_snapshot
 from utils.log_utils import log_action
-from utils.filters import get_active_dataframe, validate_step_button  # Import de validate_step_button
-from utils.ui_utils import show_header_image_safe, show_icon_header, show_eda_progress
+from utils.filters import get_active_dataframe
+from utils.ui_utils import show_header_image_safe, show_icon_header
+from utils.eda_utils import detect_outliers  # 🔁 source unique pour la détection
 
 
 def run_anomalies():
-    # === En-tête visuel et barre de progression ===
+    # === En-tête visuel + barre compacte =====================
     show_header_image_safe("bg_moon_trail.png")
     show_icon_header("🚨", "Anomalies", "Détection de valeurs extrêmes via Z-score ou IQR")
-    show_eda_progress(EDA_STEPS, st.session_state.get("validation_steps", {}))
+ 
 
-    # === Sélection du fichier actif ===
+    # === Sélection du DataFrame actif ========================
     df, nom = get_active_dataframe()
     if df is None:
-        st.warning("❌ Aucun fichier actif. Merci de sélectionner un fichier dans l’onglet Chargement.")
+        st.warning("❌ Aucun fichier actif. Sélectionne/charge un fichier dans l’onglet « Chargement ».")
         return
 
-    # === Sélection de variable numérique ===
+    # Variables numériques disponibles
     numerical_cols = df.select_dtypes(include="number").columns.tolist()
     if not numerical_cols:
         st.error("❌ Aucune variable numérique détectée dans le fichier.")
         return
 
-    colonne = st.selectbox("📈 Variable à analyser", numerical_cols)
-    methode = st.radio("🧮 Méthode de détection", ["z-score", "iqr"], horizontal=True)
-    seuil = st.slider("Seuil de détection", 1.0, 5.0, 3.0, step=0.5)
+    # === Paramètres d'analyse =================================
+    col = st.selectbox("📈 Variable à analyser", numerical_cols, key="anom_col")
+    method = st.radio("🧮 Méthode de détection", ["zscore", "iqr"], horizontal=True, key="anom_method")
+    threshold = st.slider("Seuil de détection", 1.0, 5.0, 3.0, step=0.5, key="anom_thr")
 
-    # === Détection d’anomalies selon la méthode choisie ===
-    serie = df[colonne].dropna()
+    serie = df[col].dropna()
 
-    if methode == "z-score":
-        z = np.abs((serie - serie.mean()) / serie.std())
-        mask = z > seuil
-    else:
-        q1, q3 = serie.quantile([0.25, 0.75])
-        iqr = q3 - q1
-        mask = (serie < q1 - seuil * iqr) | (serie > q3 + seuil * iqr)
+    # Garde-fous pour bornes et messages
+    mu = float(serie.mean()) if not serie.empty else 0.0
+    sigma = float(serie.std(ddof=0)) if not serie.empty else 0.0
+    q1, q3 = (float(serie.quantile(0.25)) if not serie.empty else 0.0,
+              float(serie.quantile(0.75)) if not serie.empty else 0.0)
+    iqr = q3 - q1
 
-    outliers = df.loc[mask.index[mask], :].copy()
-    outliers["__outlier_sur__"] = colonne
+    # === Détection via utilitaire commun ======================
+    # detect_outliers s’attend à un DF (même une seule colonne)
+    try:
+        outliers = detect_outliers(df[[col]], method=method if method != "zscore" else "zscore", threshold=threshold)
+        # on obtient soit un DataFrame des lignes outliers, soit un index — on harmonise :
+        if isinstance(outliers, pd.Index):
+            outliers_df = df.loc[outliers].copy()
+        elif isinstance(outliers, pd.DataFrame):
+            # si l’outil renvoie juste la colonne, on la recolle à df :
+            if list(outliers.columns) == [col]:
+                outliers_df = df.loc[outliers.index].copy()
+            else:
+                outliers_df = outliers.copy()
+        else:
+            # cas de repli (shouldn’t happen)
+            outliers_df = df.loc[df.index.intersection(serie.index)].iloc[0:0].copy()
+    except Exception as e:
+        st.error(f"❌ Erreur dans la détection des outliers : {e}")
+        return
 
-    # === Affichage des résultats ===
-    st.markdown(f"### 🔎 Résultats : **{len(outliers)} outliers détectés**")
+    outliers_df["__outlier_sur__"] = col
 
-    if not outliers.empty:
-        # Afficher les 10 premiers outliers
+    # === Résultats & visuels ==================================
+    n_out = len(outliers_df)
+    st.markdown(f"### 🔎 Résultats : **{n_out} outlier(s)** détecté(s) sur `{col}` (méthode : **{method}**)")
+    if n_out:
         with st.expander("🔎 Détails des outliers détectés"):
-            st.dataframe(outliers.head(10), use_container_width=True)
+            st.dataframe(outliers_df.head(10), use_container_width=True)
 
-        # Histogramme avec superposition des outliers
-        fig = px.histogram(df, x=colonne, nbins=40, title=f"Distribution de {colonne} avec outliers")
-        fig.add_vlines(outliers[colonne], line_color="red", line_dash="dot")
-        st.plotly_chart(fig, use_container_width=True)
+    # Histogramme + bornes claires (plutôt que des centaines de vlines)
+    fig = px.histogram(df, x=col, nbins=40, title=f"Distribution de {col}")
+    # Ajout des bornes selon la méthode choisie
+    if method == "zscore":
+        if sigma == 0:
+            st.info("ℹ️ σ = 0 (distribution dégénérée) : pas de bornes Z-score tracées.")
+        else:
+            lower = mu - threshold * sigma
+            upper = mu + threshold * sigma
+            fig.add_vline(x=lower, line_color="red", line_dash="dash")
+            fig.add_vline(x=upper, line_color="red", line_dash="dash")
+            st.caption(f"Bornes Z-score : [{lower:.3g}, {upper:.3g}]  (μ={mu:.3g}, σ={sigma:.3g}, z={threshold})")
+    else:  # IQR
+        if iqr == 0:
+            st.info("ℹ️ IQR = 0 (Q1=Q3) : pas de bornes IQR tracées.")
+        else:
+            lower = q1 - threshold * iqr
+            upper = q3 + threshold * iqr
+            fig.add_vline(x=lower, line_color="red", line_dash="dash")
+            fig.add_vline(x=upper, line_color="red", line_dash="dash")
+            st.caption(f"Bornes IQR : [{lower:.3g}, {upper:.3g}]  (Q1={q1:.3g}, Q3={q3:.3g}, IQR={iqr:.3g}, k={threshold})")
 
-        # Export des résultats
-        if st.button("💾 Exporter les anomalies détectées"):
-            save_snapshot(outliers, suffix="anomalies")
-            log_action("anomalies_export", f"{len(outliers)} outliers détectés sur {colonne} via {methode}")
-            st.success("✅ Snapshot des outliers sauvegardé.")
+    st.plotly_chart(fig, use_container_width=True)
 
-        # Sélection interactive des outliers
+    # === Export / snapshot des anomalies ======================
+    if n_out and st.button("💾 Exporter les anomalies détectées", key="anom_export"):
+        save_snapshot(outliers_df, suffix=f"outliers_{method}")
+        log_action("anomalies_export", f"{n_out} outliers sur {col} via {method} (seuil={threshold})")
+        st.success("✅ Snapshot des outliers sauvegardé.")
+
+    # === Sélection & correction (suppression) =================
+    if n_out:
         st.subheader("🔧 Sélection et correction des outliers")
-        selected_outliers = st.multiselect("Sélectionnez les outliers à corriger ou supprimer", outliers.index.tolist())
-        if selected_outliers:
-            df_corrected = df.drop(index=selected_outliers)
+        # multiselect sur l’index des lignes outliers
+        selected_idx = st.multiselect(
+            "Lignes à supprimer (index du DataFrame)",
+            options=outliers_df.index.tolist(),
+            key="anom_sel_idx"
+        )
+        if selected_idx:
+            df_corrected = df.drop(index=selected_idx)
             st.session_state.df = df_corrected
-            st.success(f"✅ {len(selected_outliers)} outliers supprimés.")
+            st.success(f"✅ {len(selected_idx)} outlier(s) supprimé(s).")
 
-            # Analyse de l'impact avant/après suppression
-            st.markdown("### 📊 Analyse de l'impact des corrections")
-            before = serie[serie.index.isin(selected_outliers)]
-            after = serie[~serie.index.isin(selected_outliers)]
-            st.write(f"Avant correction : {before.describe()}")
-            st.write(f"Après correction : {after.describe()}")
+            # Impact avant/après sur la variable cible
+            with st.expander("📊 Impact des suppressions", expanded=False):
+                before = df[col]
+                after = df_corrected[col]
+                st.write("Avant :", before.describe())
+                st.write("Après  :", after.describe())
 
     else:
         st.success("✅ Aucun outlier détecté sur cette variable.")
 
-    # === Validation finale de l'étape ===
-    validate_step_button("anomalies")  # Remplacement de validate_step par validate_step_button
+ 

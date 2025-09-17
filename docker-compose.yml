@@ -1,35 +1,40 @@
 # =============================================================================
-# VERSION DU FICHIER DOCKER COMPOSE
+# DATALYZER — docker-compose.yml (simple, clair, commenté)
+# Objectif : un seul service Streamlit, avec les dossiers utiles montés.
+# Prérequis : un Dockerfile nommé "Dockerfile.streamlit" à la racine
+#             qui lance : streamlit run /app/app.py --server.address=0.0.0.0
 # =============================================================================
-# version: '3.9'  # On utilise la version 3.9 de Docker Compose, qui offre de nombreuses fonctionnalités modernes.
 
-
-# =============================================================================
-# DÉFINITION DES SERVICES
-# =============================================================================
 services:
-
-  # ---------------------------------------------------------------------------
-  # SERVICE STREAMLIT
-  # ---------------------------------------------------------------------------
   streamlit:
-    # Configuration de la construction de l'image pour le service streamlit
+    # -- Construction de l'image à partir de ton Dockerfile dédié
     build:
-      context: .                  # Contexte de build : le répertoire courant
-      dockerfile: Dockerfile.streamlit  # Utilise le Dockerfile dédié à Streamlit pour construire l'image
+      context: .                  # Contexte = racine du projet (où se trouvent app.py, requirements.txt, etc.)
+      dockerfile: Dockerfile.streamlit
+
+    container_name: datalyzer     # Nom lisible du conteneur (facilite les commandes docker compose logs/exec)
+
+    # -- Publication du port Streamlit (interne 8501 → hôte 8501)
     ports:
-      - "8501:8501"               # Expose le port 8501 du conteneur sur le port 8501 de l'hôte (accès à l'interface Streamlit via localhost:8501)
+      - "8501:8501"
+
+    # -- Volumes : on partage seulement ce qui doit varier à chaud
     volumes:
-      - ./data:/app/data          # Monte le même dossier 'data' que pour FastAPI afin d'avoir accès aux mêmes fichiers
-      - ./static:/app/static
+      - ./data:/app/data          # Données (uploads, exports) : persiste hors conteneur
+      - ./static:/app/static      # Images/ressources statiques
+      - ./assets:/app/assets      # CSS/JS custom, thèmes, etc. (utiles à l’UI)
 
-    networks:
-      - eda-net                   # Connecte ce service au même réseau "eda-net" pour faciliter la communication entre les services
+    # -- Variables d'env Streamlit (qualité de vie en local)
+    environment:
+      STREAMLIT_SERVER_ENABLE_CORS: "false"              # évite des erreurs CORS en local
+      STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION: "false"   # simplifie le dev local
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"      # pas de télémétrie Streamlit
 
+    # -- Redémarre automatiquement si le process s'arrête (hors 'docker compose stop')
+    restart: unless-stopped
 
-# =============================================================================
-# CONFIGURATION DU RÉSEAU
-# =============================================================================
+# Réseau par défaut "bridge" : suffisant ici, pas besoin de config avancée
+# (Laisser Docker créer le réseau par défaut est la solution la plus simple)
 networks:
-  eda-net:
-    driver: bridge              # Utilise le driver "bridge" par défaut pour le réseau, ce qui permet aux conteneurs de communiquer
+  default:
+    driver: bridge
