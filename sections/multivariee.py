@@ -15,12 +15,12 @@ from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
-
-from utils.steps import EDA_STEPS
+ 
 from utils.snapshot_utils import save_snapshot
 from utils.log_utils import log_action
 from utils.filters import get_active_dataframe, validate_step_button
-from utils.ui_utils import section_header, show_eda_progress, show_footer
+from utils.ui_utils import section_header, show_footer
+
 
 
 # =============================== Helpers internes ==============================
@@ -69,7 +69,12 @@ def _fit_pca(X: pd.DataFrame, n_components: int) -> tuple[PCA, pd.DataFrame, pd.
     return pca, scores, exp, cum
 
 
-def _fit_kmeans(X: pd.DataFrame, k: int, n_init: int = "auto", random_state: int = 42) -> tuple[KMeans, np.ndarray, float]:
+def _fit_kmeans(
+    X: pd.DataFrame,
+    k: int,
+    n_init: int = 10,           # ← compat versions < 1.4 (au lieu de "auto")
+    random_state: int = 42,
+) -> tuple[KMeans, np.ndarray, float]:
     """
     Ajuste un K-means et retourne :
       - modèle KMeans
@@ -78,14 +83,17 @@ def _fit_kmeans(X: pd.DataFrame, k: int, n_init: int = "auto", random_state: int
     """
     km = KMeans(n_clusters=k, n_init=n_init, random_state=random_state)
     labels = km.fit_predict(X.values)
+
     sil = float("nan")
-    # silhouette_score nécessite au moins 2 clusters non vides
     try:
-        if len(set(labels)) > 1:
+        # silhouette dispo si au moins 2 clusters non vides et ≥ 2 observations
+        if len(set(labels)) > 1 and X.shape[0] >= 2:
             sil = float(silhouette_score(X.values, labels))
     except Exception:
         pass
+
     return km, labels, sil
+
 
 
 # ================================== Vue =======================================
@@ -109,14 +117,13 @@ def run_multivariee() -> None:
       - Des snapshots sont créés pour tracer l’historique.
       - Les actions sont loguées.
     """
-    # ---------- En-tête + barre compacte ----------
+    # ---------- En-tête ----------
     section_header(
         title="Multivariée",
         subtitle="PCA pour réduire la dimension et K-means pour regrouper les observations.",
-        section="analyse",
-        emoji="🧩",
+        section="multivariee",  # ← bannières : SECTION_BANNERS["multivariee"]
+        emoji="",
     )
-    show_eda_progress(EDA_STEPS, compact=True, single_row=True)
 
     # ---------- DataFrame actif ----------
     df, nom = get_active_dataframe()
@@ -143,12 +150,30 @@ def run_multivariee() -> None:
         st.info("Sélectionnez au moins une variable.")
         return
 
-    # Prétraitement simple : sous-ensemble + dropna
+    # Prétraitement : imputation douce (par défaut) ou dropna listwise
     X_raw = df[cols_selected].copy()
-    X = _select_numeric(X_raw)  # dropna listwise
-    dropped = len(X_raw) - len(X)
-    if dropped:
-        st.caption(f"ℹ️ {dropped} ligne(s) supprimée(s) pour valeurs manquantes sur les variables retenues.")
+    do_impute = st.checkbox(
+        "Imputer les valeurs manquantes (moyenne)",
+        value=True,
+        help="Évite de perdre toutes les lignes si des NA sont présents."
+    )
+
+    if do_impute:
+        X = X_raw.apply(pd.to_numeric, errors="coerce")
+        # on retire les colonnes totalement vides
+        X = X.drop(columns=[c for c in X.columns if X[c].isna().all()], errors="ignore")
+        X = X.fillna(X.mean(numeric_only=True))
+        dropped = 0
+    else:
+        X = X_raw.dropna(axis=0, how="any")
+        dropped = len(X_raw) - len(X)
+        if dropped:
+            st.caption(f"ℹ️ {dropped} ligne(s) supprimée(s) pour valeurs manquantes sur les variables retenues.")
+
+    # Garde-fous
+    if X.shape[0] == 0 or X.shape[1] == 0:
+        st.error("❌ Aucune donnée exploitable après préparation. Activez l’imputation ou réduisez la sélection.")
+        return
 
     # ============================== PCA =======================================
     st.markdown("## 📉 PCA — Réduction de dimension")
@@ -157,10 +182,25 @@ def run_multivariee() -> None:
     with col_std1:
         do_standardize = st.checkbox("Standardiser (Z-score)", value=True, help="Recommandé si les échelles diffèrent.")
     with col_std2:
-        n_comp = st.slider("Nombre de composantes", min_value=2, max_value=min(10, len(cols_selected)), value=2)
+        # n_components <= min(n_samples, n_features)
+        max_pcs = int(max(1, min(10, X.shape[0], X.shape[1])))
+        n_comp = st.slider(
+            "Nombre de composantes",
+            min_value=1 if max_pcs == 1 else 2,
+            max_value=max_pcs,
+            value=min(2, max_pcs),
+        )
 
-    X_std, scaler = _standardize(X) if do_standardize else (X.copy(), None)
+    # Standardisation robuste
+    try:
+        X_std, scaler = _standardize(X) if do_standardize else (X.copy(), None)
+    except ValueError as e:
+        st.error(f"Standardisation impossible : {e}")
+        return
+
+    # PCA
     pca, scores, exp, cum = _fit_pca(X_std, n_components=n_comp)
+
 
     # Scree plot (variance expliquée)
     scree_df = pd.DataFrame({"Composante": exp.index, "Var (%)": exp.values, "Cumul (%)": cum.values})
@@ -179,24 +219,28 @@ def run_multivariee() -> None:
     if color_by != "Aucune":
         proj_df[color_by] = df.loc[proj_df.index, color_by]
 
+    fig_proj = None
     if proj_mode == "2D":
-        fig_proj = px.scatter(
-            proj_df, x="PC1", y="PC2",
-            color=None if color_by == "Aucune" else color_by,
-            hover_data=[proj_df.index],
-            title="Projection PCA (PC1 vs PC2)"
-        )
-    else:
-        if "PC3" not in proj_df.columns:
-            st.info("ℹ️ Au moins 3 composantes nécessaires pour la projection 3D.")
-            fig_proj = None
+        if proj_df.shape[1] >= 2:
+            fig_proj = px.scatter(
+                proj_df, x="PC1", y="PC2",
+                color=None if color_by == "Aucune" else color_by,
+                hover_data=[proj_df.index],
+                title="Projection PCA (PC1 vs PC2)"
+            )
         else:
+            st.info("ℹ️ Au moins 2 composantes nécessaires pour la 2D.")
+    else:  # 3D
+        if {"PC1","PC2","PC3"}.issubset(proj_df.columns):
             fig_proj = px.scatter_3d(
                 proj_df, x="PC1", y="PC2", z="PC3",
                 color=None if color_by == "Aucune" else color_by,
                 hover_data=[proj_df.index],
                 title="Projection PCA (PC1 vs PC2 vs PC3)"
             )
+        else:
+            st.info("ℹ️ Au moins 3 composantes nécessaires pour la 3D.")
+
     if fig_proj is not None:
         st.plotly_chart(fig_proj, use_container_width=True)
 
@@ -227,6 +271,8 @@ def run_multivariee() -> None:
     st.divider()
 
     # ============================== K-MEANS ====================================
+    # ✅ Section K-means (UI) robuste + typage Int64 des labels
+    # ============================== K-MEANS ====================================
     st.markdown("## 🧭 K-means — Regroupements")
 
     use_space = st.radio(
@@ -247,43 +293,55 @@ def run_multivariee() -> None:
 
     # Ajustement K-means
     if st.button("🚀 Lancer le clustering K-means"):
-        try:
-            km, labels, sil = _fit_kmeans(X_cluster, k=k)
-            st.success(f"✅ Clustering terminé. Silhouette = {sil:.3f}" if np.isfinite(sil) else "✅ Clustering terminé.")
+        # Garde-fous avant fit
+        if X_cluster is None or X_cluster.shape[0] == 0:
+            st.error("❌ Aucune observation disponible pour le clustering.")
+        elif X_cluster.shape[0] < k:
+            st.error(f"❌ {X_cluster.shape[0]} observation(s) seulement, inférieur à k={k}. Réduisez k.")
+        else:
+            try:
+                km, labels, sil = _fit_kmeans(X_cluster, k=k)
+                st.success(f"✅ Clustering terminé. Silhouette = {sil:.3f}" if np.isfinite(sil) else "✅ Clustering terminé.")
 
-            # Ajouter les labels au DF actif (alignement sur index de X_cluster)
-            label_col = f"cluster_k{k}_{space_label}"
-            df.loc[X_cluster.index, label_col] = labels
-            st.session_state["df"] = df
+                # Ajouter les labels au DF actif (index aligné) avec dtype nullable
+                label_col = f"cluster_k{k}_{space_label}"
+                df.loc[X_cluster.index, label_col] = pd.Series(labels, index=X_cluster.index, dtype="Int64")
+                st.session_state["df"] = df
 
-            # Visualisation dans l’espace choisi
-            if use_space == "Scores PCA":
-                vis_df = scores.copy()
-            else:
-                # Si pas de PCA, on projette rapidement en 2D via PCA pour visualisation
-                _, vis_scores, _, _ = _fit_pca(X_std, n_components=min(2, X_std.shape[1]))
-                vis_df = vis_scores.copy()
+                # Visualisation : 2D si possible
+                if use_space == "Scores PCA":
+                    vis_df = scores.copy()
+                    can_plot = vis_df.shape[1] >= 2
+                else:
+                    # Si pas de PCA affichable, crée une 2D de visu via PCA(2) si ≥2 features
+                    if X_std.shape[1] >= 2:
+                        _, vis_scores, _, _ = _fit_pca(X_std, n_components=2)
+                        vis_df = vis_scores.copy()
+                        can_plot = True
+                    else:
+                        can_plot = False
 
-            vis_df[label_col] = pd.Series(labels, index=X_cluster.index)
-            fig_clusters = px.scatter(
-                vis_df,
-                x=vis_df.columns[0], y=vis_df.columns[1],
-                color=label_col,
-                hover_data=[vis_df.index],
-                title=f"Clusters K={k} ({'PCA' if use_space=='Scores PCA' else 'PCA(2) pour visualisation'})"
-            )
-            st.plotly_chart(fig_clusters, use_container_width=True)
+                if can_plot:
+                    vis_df[label_col] = pd.Series(labels, index=X_cluster.index)
+                    fig_clusters = px.scatter(
+                        vis_df,
+                        x=vis_df.columns[0], y=vis_df.columns[1],
+                        color=label_col,
+                        hover_data=[vis_df.index],
+                        title=f"Clusters K={k} ({'PCA' if use_space=='Scores PCA' else 'PCA(2) pour visualisation'})"
+                    )
+                    st.plotly_chart(fig_clusters, use_container_width=True)
+                else:
+                    st.info("Visualisation 2D indisponible (moins de deux dimensions).")
 
-            # Sauvegarde
-            save_snapshot(df.loc[X_cluster.index, [label_col]], suffix=label_col)
-            log_action("kmeans_fit", f"k={k} on {space_label}, silhouette={sil:.3f}")
-        except Exception as e:
-            st.error(f"❌ Erreur K-means : {e}")
+                # Sauvegarde (snapshot des labels uniquement)
+                save_snapshot(df.loc[X_cluster.index, [label_col]], suffix=label_col)
+                log_action("kmeans_fit", f"k={k} on {space_label}, silhouette={sil:.3f}")
+            except Exception as e:
+                st.error(f"❌ Erreur K-means : {e}")
 
-    st.divider()
 
     # ---------- Validation étape EDA ----------
-    # Choix : on valide une étape dédiée 'multivariate' (si présente dans EDA_STEPS)
     validate_step_button("multivariate", context_prefix="multi_")
 
     # ---------- Footer ----------

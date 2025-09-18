@@ -15,14 +15,14 @@
 from __future__ import annotations
 
 import re
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import List, Optional, Sequence, Tuple
+
 
 import pandas as pd
 import streamlit as st
 
 from utils.snapshot_utils import save_snapshot
 from utils.log_utils import log_action
-from utils.filters import validate_step_button
 from utils.ui_utils import section_header, show_footer
 
 
@@ -239,7 +239,7 @@ def run_jointures() -> None:
         title="Jointures intelligentes",
         subtitle="Fusionnez deux fichiers via suggestions ou sélection manuelle des clés.",
         section="jointures",     # → image depuis config.SECTION_BANNERS["jointures"]
-        emoji="🔗",
+        emoji="",
     )
 
     # ---------- Vérification des fichiers ----------
@@ -258,7 +258,7 @@ def run_jointures() -> None:
     df_right = dfs[fichier_droit]
 
     # ---------- Aperçu rapide des colonnes ----------
-    st.markdown("### 🧩 Colonnes disponibles")
+    st.subheader("🧩 Colonnes disponibles")
     c1, c2 = st.columns(2)
     with c1:
         st.markdown(f"**{fichier_gauche}**")
@@ -267,10 +267,11 @@ def run_jointures() -> None:
         st.markdown(f"**{fichier_droit}**")
         st.code(", ".join(map(str, df_right.columns)))
 
-    st.divider()
+
 
     # ---------- Suggestions automatiques ----------
-    st.markdown("### 🤖 Suggestions automatiques de jointure")
+
+    st.subheader("🤖 Suggestions automatiques de jointure")
     df_suggest = _suggest_matches(df_left, df_right)
     if df_suggest is not None:
         st.dataframe(df_suggest, use_container_width=True, height=240)
@@ -281,10 +282,11 @@ def run_jointures() -> None:
     else:
         st.info("Aucune correspondance automatique jugée pertinente (≥ 10%).")
 
-    st.divider()
+
 
     # ---------- Sélection manuelle des clés ----------
-    st.markdown("### 🛠️ Sélection manuelle des colonnes à joindre")
+
+    st.subheader("🛠️ Sélection manuelle des colonnes à joindre")
     left_on = st.multiselect(
         "🔑 Clés du fichier gauche", df_left.columns.tolist(),
         key="left_on", help="Vous pouvez sélectionner plusieurs colonnes (clé composite)."
@@ -296,7 +298,7 @@ def run_jointures() -> None:
 
     # Affiche des stats rapides pour la sélection courante
     if left_on and right_on and len(left_on) == len(right_on):
-        st.markdown("### 📊 Statistiques de correspondance (sélection)")
+        st.subheader("📊 Statistiques de correspondance (sélection)")
         rows = []
         for l, r in zip(left_on, right_on):
             cov, jac, nL, nR, nI = _coverage_metrics(df_left[l], df_right[r])
@@ -397,15 +399,6 @@ def run_jointures() -> None:
         # Guide l'utilisateur vers la condition d'activation :
         # même nombre de colonnes entre gauche et droite.
         st.info("💡 Sélectionnez un nombre **égal** de clés dans les deux fichiers pour activer la jointure.")
-
-    # ---------- Validation d’étape ----------
-    # Permet de marquer la progression utilisateur dans le workflow.
-    if "df" in st.session_state and isinstance(st.session_state["df"], pd.DataFrame):
-        validate_step_button(
-            "jointures",
-            label="✅ Valider l’étape",
-            context_prefix="jointr_",
-        )
 
     # ---------- Footer ----------
     show_footer(

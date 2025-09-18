@@ -54,8 +54,8 @@ def run_exploration() -> None:
     section_header(
         title="Exploration",
         subtitle="Analyse des types, valeurs manquantes, distributions, outliers et corrélations.",
-        section="analyse",  # → image depuis config.SECTION_BANNERS["analyse"]
-        emoji="🔍",
+        section="exploration",  # ← utilise SECTION_BANNERS["exploration"]
+        emoji="",
     )
 
     # ---------- Barre de progression ----------
@@ -66,6 +66,7 @@ def run_exploration() -> None:
     if df is None:
         st.warning("❌ Aucun fichier actif. Importez un fichier via l’onglet **Chargement**.")
         return
+
 
     # Colonnes numériques détectées (utile dans plusieurs onglets)
     num_cols = df.select_dtypes(include="number").columns.tolist()
@@ -86,7 +87,7 @@ def run_exploration() -> None:
         summary = summarize_dataframe(df)
         st.dataframe(summary, use_container_width=True)
 
-        with st.expander("🔎 Détails des dtypes par colonne", expanded=False):
+        with st.expander("🔎 Détails des types par colonne", expanded=False):
             dtypes_df = pd.DataFrame({
                 "Colonne": df.columns,
                 "dtype": [str(t) for t in df.dtypes],
@@ -98,7 +99,7 @@ def run_exploration() -> None:
             "(conversions, datetime, booléens, etc.), utilisez la page **Typage**."
         )
 
-        validate_step_button("types", context_prefix="exploration_")
+        validate_step_button("typing", context_prefix="exploration_")
 
     # ---------------------------------------------------------
     # 🩹 Valeurs manquantes
@@ -141,6 +142,7 @@ def run_exploration() -> None:
 
         validate_step_button("missing", context_prefix="exploration_")
 
+
     # ---------------------------------------------------------
     # 📈 Statistiques descriptives
     # ---------------------------------------------------------
@@ -161,6 +163,7 @@ def run_exploration() -> None:
         st.info(f"Taux global de valeurs manquantes : **{pct_missing:.2f}%**")
 
         validate_step_button("stats", context_prefix="exploration_")
+
 
     # ---------------------------------------------------------
     # 📊 Distributions
@@ -185,7 +188,8 @@ def run_exploration() -> None:
             )
             st.info(f"Asymétrie de `{col}` : **{skew:.2f}** → *{skew_type}*")
 
-        validate_step_button("histos", context_prefix="exploration_")
+        validate_step_button("distributions", context_prefix="exploration_")
+
 
     # ---------------------------------------------------------
     # 🚨 Outliers
@@ -217,7 +221,8 @@ def run_exploration() -> None:
                 log_action("outliers_detected", f"{len(outliers)} sur {col} ({method})")
                 st.success("✅ Snapshot des outliers enregistré.")
 
-        validate_step_button("outliers", context_prefix="exploration_")
+        validate_step_button("extremes", context_prefix="exploration_")
+
 
     # ---------------------------------------------------------
     # 🔗 Corrélations
@@ -257,6 +262,7 @@ def run_exploration() -> None:
 
         validate_step_button("correlations", context_prefix="exploration_")
 
+
     # ---------------------------------------------------------
     # 🧼 Nettoyage auto
     # ---------------------------------------------------------
@@ -286,7 +292,10 @@ def run_exploration() -> None:
 
         validate_step_button("cleaning", context_prefix="exploration_")
 
-    # ---------- Footer ----------
+    
+    # ---------------------------------------------------------
+    # Footer 
+    # ---------------------------------------------------------
     show_footer(
         author="Xavier Rousseau",
         site_url="https://xavrousseau.github.io/",

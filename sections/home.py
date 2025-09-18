@@ -21,7 +21,6 @@ import streamlit as st
 from utils.ui_utils import section_header, ui_card, show_footer
 from config import APP_NAME, color
 
-
 # ---------- Constantes UI ----------
 # Petit aphorisme d’intro ; s’affiche avant le titre principal.
 PRE_TITLE_QUOTE: str = "« La clarté naît de la structure. » — Datalyzer"
@@ -63,14 +62,15 @@ def run_home() -> None:
     # ---------- En-tête standard (bannière + citation + titre + baseline) ----------
     # `section="home"` fait chercher l’image dans config.SECTION_BANNERS["home"].
     section_header(
-        title=APP_NAME,
-        subtitle=(
-            "Une plateforme sobre et efficace pour explorer, nettoyer "
-            "et structurer vos données tabulaires."
-        ),
-        section="home",
-        prequote=PRE_TITLE_QUOTE,
-    )
+      title=APP_NAME,
+      subtitle=(
+          "Une plateforme sobre et efficace pour explorer, nettoyer "
+          "et structurer vos données tabulaires."
+      ),
+      section="home",
+      prequote=PRE_TITLE_QUOTE,
+      emoji="🏯",
+  )
 
     # ---------- Bloc “Pour bien démarrer” ----------
     # Petit encart didactique, neutre et lisible, avec role ARIA.
@@ -94,8 +94,9 @@ def run_home() -> None:
     )
 
     # Séparateur visuel léger
-    st.markdown("---")
-    st.markdown("### Aperçu de l'application")
+
+    st.subheader("Aperçu de l'application")
+
 
     # ---------- Trois colonnes ----------
     # Astuce : sur des écrans étroits, Streamlit empile les colonnes ;

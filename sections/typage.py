@@ -9,12 +9,13 @@ from __future__ import annotations
 
 import pandas as pd
 import streamlit as st
-from utils.steps import EDA_STEPS
-from config import color
+ 
+ 
 from utils.snapshot_utils import save_snapshot
 from utils.log_utils import log_action
-from utils.filters import get_active_dataframe
-from utils.ui_utils import section_header, show_eda_progress, show_footer
+from utils.filters import get_active_dataframe, validate_step_button
+from utils.ui_utils import section_header, show_footer
+
 
 
 def run_typage() -> None:
@@ -42,12 +43,10 @@ def run_typage() -> None:
     section_header(
         title="Typage",
         subtitle="Suggestions automatiques et corrections interactives des types.",
-        section="analyse",  # image définie dans config.SECTION_BANNERS["analyse"]
-        emoji="🧾",
+        section="typage",  # ← utilise SECTION_BANNERS["typage"]
+        emoji="",
     )
 
-    # ---------- Barre de progression (visuelle, non bloquante) ----------
-    show_eda_progress(EDA_STEPS, compact=True, single_row=True)
 
     # ---------- Fichier actif ----------
     df, nom = get_active_dataframe()
@@ -157,6 +156,9 @@ def run_typage() -> None:
         "ℹ️ Cette page est un **atelier de typage**. "
         "La validation de l’étape *Types de variables* se fait depuis l’onglet **Exploration → Types**."
     )
+
+    # ---------- Validation étape EDA ----------
+    validate_step_button("typing", context_prefix="typage_")
 
     # ---------- Footer ----------
     show_footer(

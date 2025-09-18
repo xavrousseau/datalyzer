@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Dict, List
+from typing import List
 
 import pandas as pd
 import streamlit as st
@@ -38,21 +38,14 @@ PREVIEW_ROWS = 100
 
 
 def _ensure_state() -> None:
-    """
-    Assure l'initialisation des clés de session nécessaires.
-
-    Pourquoi :
-      - Évite les KeyError et garantit que KEY_DFS existe avant usage.
-    """
+    """Assure l'initialisation des clés de session nécessaires."""
     st.session_state.setdefault(KEY_DFS, {})
 
 
 def _sanitize_key(s: str) -> str:
     """
     Transforme un libellé libre en *clé* Streamlit stable (sans espaces/accents).
-
-    Exemple :
-      "Mon Fichier (v1).csv" -> "mon_fichier_v1_csv"
+    Exemple : "Mon Fichier (v1).csv" -> "mon_fichier_v1_csv"
     """
     s = s.strip().lower()
     return re.sub(r"[^\w\-\.]+", "_", s)
@@ -62,13 +55,9 @@ def _read_uploaded_file(file) -> pd.DataFrame:
     """
     Lit un fichier téléversé (Streamlit UploadedFile) en DataFrame selon l’extension.
 
-    Stratégie :
-      - CSV/TXT : sep=None + engine="python" → *sniff* automatique de ; , \t …
-      - Excel   : via pandas (engine openpyxl recommandé en requirements).
-      - Parquet : via pyarrow/fastparquet selon dispo.
-
-    Robustesse :
-      - Soulève des erreurs explicites (ValueError/RuntimeError) avec le nom du fichier.
+    - CSV/TXT : sep=None + engine="python" → *sniff* automatique de ; , \t …
+    - Excel   : via pandas (engine openpyxl recommandé en requirements).
+    - Parquet : via pyarrow/fastparquet selon dispo.
     """
     name = getattr(file, "name", "fichier_sans_nom")
     ext = os.path.splitext(name)[1].lower()
@@ -78,7 +67,6 @@ def _read_uploaded_file(file) -> pd.DataFrame:
 
     try:
         if ext in {".csv", ".txt"}:
-            # engine="python" + sep=None : robustesse aux séparateurs variés.
             df = pd.read_csv(file, sep=None, engine="python")
         elif ext in {".xlsx", ".xls"}:
             df = pd.read_excel(file)
@@ -87,48 +75,42 @@ def _read_uploaded_file(file) -> pd.DataFrame:
         else:
             raise ValueError(f"Extension inattendue : {ext}")
     except Exception as e:
-        # Erreur packagée pour l’UI (lisible côté utilisateur).
         raise RuntimeError(f"Erreur de lecture de {name} ({ext}) : {e}") from e
 
-    # Option : dédupliquer d’éventuelles colonnes homonymes.
-    # df = df.loc[:, ~df.columns.duplicated()]
     return df
 
 
-def _summarize_dataframe(name: str, df: pd.DataFrame) -> Dict[str, object]:
+def _summarize_dataframe(name: str, df: pd.DataFrame) -> dict[str, object]:
     """
-    Produit un résumé synthétique pour affichage tabulaire.
-
-    Contenu :
+    Résumé synthétique :
       - Lignes, Colonnes
-      - % de valeurs manquantes (NA %)
-      - 3 types les plus fréquents (Types dominants)
+      - % de valeurs manquantes
+      - 3 types dominants
     """
     rows, cols = df.shape
     total_cells = rows * cols
     na_pct = round((df.isna().sum().sum() / total_cells) * 100, 2) if total_cells else 0.0
     type_counts = df.dtypes.value_counts()
     top_types = ", ".join(type_counts.head(3).index.astype(str))
-    return {
-        "Fichier": name,
-        "Lignes": rows,
-        "Colonnes": cols,
-        "NA (%)": na_pct,
-        "Types dominants": top_types,
-    }
+    return {"Fichier": name, "Lignes": rows, "Colonnes": cols, "NA (%)": na_pct, "Types dominants": top_types}
 
 
 def _attach_as_active(df: pd.DataFrame, name: str) -> None:
     """
-    Place le DataFrame dans l’état Streamlit :
-      - l’ajoute au dictionnaire des fichiers (KEY_DFS)
-      - le définit comme actif (KEY_DF)
-
-    Remarque :
-      - Le *nom* sert de clé d’accès dans KEY_DFS et d’étiquette dans l’UI.
+    Ajoute le DataFrame dans KEY_DFS et le définit comme actif (KEY_DF).
     """
     st.session_state[KEY_DFS][name] = df
     st.session_state[KEY_DF] = df
+
+
+# === Cache léger pour éviter de recharger un snapshot plusieurs fois durant la session ===
+@st.cache_data(show_spinner=False)
+def _load_snapshot_cached(snap_name: str) -> pd.DataFrame:
+    df = load_snapshot_by_name(snap_name)
+    # On ne retourne jamais None ici : si problème, on lève pour affichage propre côté UI
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        raise ValueError("Snapshot introuvable ou vide.")
+    return df
 
 
 # ============================== Vue principale ================================
@@ -143,30 +125,25 @@ def run_chargement() -> None:
          - Sélection du fichier actif
          - Aperçu borné
       2) Gestion des snapshots
-         - Lister, recharger, supprimer
-
-    Dépendances attendues :
-      - utils.snapshot_utils : save_snapshot, list_snapshots, load_snapshot_by_name, delete_snapshot
-      - utils.log_utils.log_action : traçabilité des actions
-      - utils.ui_utils.section_header/show_footer : habillage cohérent
+         - Lister, prévisualiser, activer, supprimer
+         - Résumé optionnel de tous les snapshots
     """
     _ensure_state()
 
-    # ---------- En-tête unifié : bannière + titre + baseline ----------
+    # ---------- En-tête unifié ----------
     section_header(
         title="Chargement & snapshots",
         subtitle="Importez vos fichiers, sélectionnez le fichier actif, gérez les versions sauvegardées.",
-        section="chargement",   # → image depuis config.SECTION_BANNERS["chargement"]
-        emoji="📥",
+        section="chargement",
+        emoji="",
     )
-
     tab1, tab2 = st.tabs(["📥 Charger un fichier", "🕰️ Snapshots existants"])
 
     # -------------------------------------------------------------------------
     # Onglet 1 : Import de fichiers utilisateur
     # -------------------------------------------------------------------------
     with tab1:
-        st.markdown("### 📥 Import de fichiers CSV, Excel, Parquet ou texte")
+        st.subheader("📥 Import de fichiers CSV, Excel, Parquet ou texte")
 
         uploaded_files = st.file_uploader(
             "Sélectionnez un ou plusieurs fichiers",
@@ -181,7 +158,7 @@ def run_chargement() -> None:
 
                 # Nom de snapshot par défaut = nom de fichier sans extension
                 default_snap = os.path.splitext(name)[0]
-                snap_key = f"snap_name_{_sanitize_key(name)}"  # clé stable pour le widget
+                snap_key = f"snap_name_{_sanitize_key(name)}"
                 snapshot_name = st.text_input(
                     f"Nom du snapshot pour {name}",
                     value=default_snap,
@@ -189,12 +166,10 @@ def run_chargement() -> None:
                     help="Nom lisible pour retrouver cette version (sans l’extension).",
                 ) or default_snap
 
-                # Sauvegarde snapshot + logs
-                save_snapshot(df, suffix=snapshot_name)  # NB : on utilise le param `suffix`
+                save_snapshot(df, suffix=snapshot_name)
                 log_action("import", f"{name} chargé")
                 st.success(f"✅ Fichier **{name}** chargé ({df.shape[0]} lignes). Snapshot : {snapshot_name}")
 
-                # Ajout / activation dans le state
                 _attach_as_active(df, name)
 
             except RuntimeError as e:
@@ -206,7 +181,7 @@ def run_chargement() -> None:
 
         # Résumé des fichiers chargés
         if st.session_state[KEY_DFS]:
-            st.markdown("### 🧾 Résumé des fichiers chargés")
+            st.subheader("🧾 Résumé des fichiers chargés")
 
             resume_rows = [
                 _summarize_dataframe(fname, fdf)
@@ -223,11 +198,11 @@ def run_chargement() -> None:
             )
             st.session_state[KEY_DF] = st.session_state[KEY_DFS][selected]
 
-            # Aperçu (expander)
+            # Aperçu
             with st.expander(f"🔍 Aperçu du fichier : {selected}", expanded=True):
-                df = st.session_state[KEY_DF]
-                st.write(f"Dimensions : {df.shape[0]} lignes × {df.shape[1]} colonnes")
-                st.dataframe(df.head(PREVIEW_ROWS), use_container_width=True)
+                df_active = st.session_state[KEY_DF]
+                st.write(f"Dimensions : {df_active.shape[0]} lignes × {df_active.shape[1]} colonnes")
+                st.dataframe(df_active.head(PREVIEW_ROWS), use_container_width=True)
         else:
             st.info("Aucun fichier chargé pour l’instant. Déposez des fichiers dans la zone ci-dessus.")
 
@@ -235,7 +210,7 @@ def run_chargement() -> None:
     # Onglet 2 : Snapshots enregistrés
     # -------------------------------------------------------------------------
     with tab2:
-        st.markdown("### 📜 Snapshots sauvegardés")
+        st.subheader("📜 Snapshots sauvegardés")
         st.info("📘 Un snapshot est une copie horodatée d’un fichier importé. Il peut être rechargé à tout moment.")
 
         snapshots: List[str] = list_snapshots()
@@ -243,34 +218,57 @@ def run_chargement() -> None:
         if not snapshots:
             st.info("Aucun snapshot enregistré pour l’instant.")
         else:
-            for snap in snapshots:
-                safe = _sanitize_key(snap)
-                col1, col2, col3 = st.columns([4, 1, 1], vertical_alignment="center")
+            # --- Résumé global optionnel (peut être coûteux si > nombreux snapshots) ---
+            if st.checkbox("Afficher un résumé de tous les snapshots (peut être long)"):
+                summaries = []
+                for snap in snapshots:
+                    try:
+                        df_snap = _load_snapshot_cached(snap)
+                        summaries.append(_summarize_dataframe(snap, df_snap))
+                    except Exception as e:
+                        summaries.append({"Fichier": snap, "Lignes": "—", "Colonnes": "—", "NA (%)": "—", "Types dominants": f"Erreur: {e}"})
+                st.dataframe(pd.DataFrame(summaries), use_container_width=True)
 
-                with col1:
-                    st.write(f"📄 {snap}")
+            st.markdown("### 🔎 Prévisualiser et activer un snapshot")
+            col_sel, col_act, col_del = st.columns([4, 1, 1], vertical_alignment="center")
 
-                with col2:
-                    if st.button("🔄 Charger", key=f"load_{safe}", help="Remplace le fichier actif par ce snapshot"):
-                        try:
-                            df = load_snapshot_by_name(snap)
-                            if df is None or not isinstance(df, pd.DataFrame) or df.empty:
-                                st.error("❌ Snapshot introuvable ou vide.")
-                            else:
-                                _attach_as_active(df, name=f"[SNAP] {snap}")
-                                st.success(f"Snapshot **{snap}** chargé ({df.shape[0]} lignes).")
-                                log_action("load_snapshot", snap)
-                        except Exception as e:
-                            st.error(f"❌ Erreur lors du chargement du snapshot « {snap} » : {e}")
+            with col_sel:
+                selected_snap = st.selectbox("Sélectionnez un snapshot", options=snapshots, key="select_snapshot")
 
-                with col3:
-                    if st.button("🗑️ Supprimer", key=f"del_{safe}", help="Supprime définitivement ce snapshot"):
-                        try:
-                            delete_snapshot(snap)
-                            log_action("delete_snapshot", snap)
-                            st.rerun()  # Rafraîchir la liste après suppression
-                        except Exception as e:
-                            st.error(f"❌ Erreur lors de la suppression : {e}")
+            with col_act:
+                # Le bouton d'activation est géré plus bas après l'aperçu pour un meilleur feedback
+                st.write("")
+
+            with col_del:
+                if st.button("🗑️ Supprimer", key="btn_delete_selected"):
+                    try:
+                        delete_snapshot(selected_snap)
+                        log_action("delete_snapshot", selected_snap)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Erreur lors de la suppression : {e}")
+
+            # --- Aperçu & activation du snapshot sélectionné ---
+            if selected_snap:
+                try:
+                    df_snap = _load_snapshot_cached(selected_snap)
+
+                    # Résumé rapide
+                    st.markdown(f"**Snapshot sélectionné :** `{selected_snap}`")
+                    summary = _summarize_dataframe(selected_snap, df_snap)
+                    st.caption(f"Dimensions : {summary['Lignes']} lignes × {summary['Colonnes']} colonnes — NA : {summary['NA (%)']}% — Types : {summary['Types dominants']}")
+
+                    # Aperçu comme pour un fichier importé
+                    with st.expander(f"🔍 Aperçu du snapshot : {selected_snap}", expanded=True):
+                        st.dataframe(df_snap.head(PREVIEW_ROWS), use_container_width=True)
+
+                    # Activation (ajoute dans KEY_DFS et le met actif)
+                    if st.button("🔄 Activer ce snapshot", type="primary", key="btn_activate_snapshot"):
+                        _attach_as_active(df_snap, name=f"[SNAP] {selected_snap}")
+                        log_action("load_snapshot", selected_snap)
+                        st.success(f"✅ Snapshot **{selected_snap}** activé ({df_snap.shape[0]} lignes). Il est maintenant le fichier actif.")
+                except Exception as e:
+                    st.error(f"❌ Erreur lors du chargement du snapshot « {selected_snap} » : {e}")
 
     # ---------- Footer ----------
     show_footer(

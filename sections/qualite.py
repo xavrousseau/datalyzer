@@ -14,14 +14,14 @@ import streamlit as st
 from utils.steps import EDA_STEPS
 from utils.eda_utils import (
     detect_constant_columns,
-    detect_low_variance_columns,
     get_columns_above_threshold,
     detect_outliers,
 )
+
 from utils.snapshot_utils import save_snapshot
 from utils.log_utils import log_action
 from utils.filters import get_active_dataframe, validate_step_button
-from utils.ui_utils import section_header, show_eda_progress, show_footer
+from utils.ui_utils import section_header, show_footer
 
 
 # =============================== Helpers internes ==============================
@@ -83,10 +83,9 @@ def run_qualite() -> None:
     section_header(
         title="Qualité",
         subtitle="Évaluez la qualité des données (score global, doublons, placeholders, outliers…).",
-        section="analyse",
-        emoji="🧪",
+        section="qualite",  # ← utilise SECTION_BANNERS["qualite"]
+        emoji="",
     )
-    show_eda_progress(EDA_STEPS, compact=True, single_row=True)
 
     # ---------- DataFrame actif ----------
     df, nom = get_active_dataframe()

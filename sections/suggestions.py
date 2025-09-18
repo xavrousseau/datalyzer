@@ -14,7 +14,7 @@ import streamlit as st
 
 from utils.snapshot_utils import save_snapshot
 from utils.log_utils import log_action
-from utils.filters import get_active_dataframe
+from utils.filters import get_active_dataframe, validate_step_button
 from utils.ui_utils import section_header, show_footer
 
 
@@ -23,15 +23,16 @@ from utils.ui_utils import section_header, show_footer
 def _is_identifier(colname: str) -> bool:
     """
     Heuristique *nominale* d'identifiant :
-      - présence de motifs usuels : id, uid, uuid, identifiant, code (borne par '_' ou début/fin).
+      motifs usuels : id, uid, uuid, identifiant, code (début/fin/_).
     """
-    return bool(re.search(r"(?:^|_)(id|uid|uuid|identifiant|code)(?:$|_)", str(colname), flags=re.I))
+    return bool(re.search(r"(?:^|_)(id|uid|uuid|identifiant|code)(?:$|_)",
+                          str(colname), flags=re.I))
 
 
 def _avg_str_len(s: pd.Series) -> float:
     """
     Longueur moyenne (approx) des chaînes après cast en dtype 'string'.
-    Utilisée pour discriminer *texte libre* vs *catégories*.
+    Sert à distinguer *texte libre* vs *catégories*.
     """
     try:
         return float(s.astype("string").str.len().dropna().mean())
@@ -48,16 +49,7 @@ def run_suggestions() -> None:
       - à **vectoriser** (texte libre / haute cardinalité),
       - à **exclure** des features (identifiants).
 
-    Paramètres utilisateur (seuils) :
-      - cat_encode_max        : nb max de modalités pour encoder une catégorie (ex: One-Hot/Target enc.).
-      - num_discrete_max      : nb max de modalités pour encoder un numérique discret (IDs déguisés exclus).
-      - text_vectorize_min    : nb min de modalités pour considérer « texte libre ».
-      - id_ratio              : ratio d’unicité au-delà duquel on classe en identifiant.
-      - long_text_len         : longueur moyenne indicative pour basculer en « texte libre ».
-
-    Effets :
-      - Possible suppression des colonnes texte (sur confirmation) + snapshot + logs.
-      - Le module n’effectue **pas** l’encodage/vectorisation lui-même (diagnostic).
+    Le module ne réalise pas l'encodage/la vectorisation ; il dresse un diagnostic.
     """
     # ---------- En-tête unifiée ----------
     section_header(
@@ -76,24 +68,25 @@ def run_suggestions() -> None:
     # ---------- Paramètres ----------
     with st.expander("⚙️ Paramètres (seuils)"):
         col_a, col_b, col_c = st.columns(3)
-        cat_encode_max = col_a.number_input("Max modalités pour encoder une catégorie", 2, 200, 50, 1)
-        num_discrete_max = col_b.number_input("Max modalités pour encoder un numérique", 2, 200, 10, 1)
+        cat_encode_max   = col_a.number_input("Max modalités pour encoder une catégorie",  2, 200, 50, 1)
+        num_discrete_max = col_b.number_input("Max modalités pour encoder un numérique",   2, 200, 10, 1)
         text_vectorize_min = col_c.number_input("Min modalités pour vectoriser un texte", 20, 5000, 100, 10)
 
         col_d, col_e = st.columns(2)
-        id_ratio = col_d.slider("Seuil d’unicité pour ‘identifiant’", 0.5, 1.0, 0.9, 0.05)
+        id_ratio     = col_d.slider("Seuil d’unicité pour ‘identifiant’", 0.5, 1.0, 0.9, 0.05)
         long_text_len = col_e.slider("Longueur moyenne (texte libre)", 10, 200, 30, 5)
 
     # ---------- Préparation des colonnes ----------
     num_cols = df.select_dtypes(include="number").columns.tolist()
     obj_cols = df.select_dtypes(include=["object", "string", "category"]).columns.tolist()
     bool_cols = df.select_dtypes(include=["bool", "boolean"]).columns.tolist()
+    # datetime + datetime avec TZ
     dt_cols = df.select_dtypes(include=["datetime", "datetimetz"]).columns.tolist()
 
     to_encode_num: dict[str, str] = {}
     to_encode_cat: dict[str, str] = {}
-    to_vectorize: dict[str, str] = {}
-    identifiers: dict[str, str] = {}
+    to_vectorize: dict[str, str]  = {}
+    identifiers: dict[str, str]   = {}
 
     n = len(df)
 
@@ -110,7 +103,7 @@ def run_suggestions() -> None:
     # ---------- Numériques discrets (à encoder) ----------
     for col in [c for c in num_cols if c not in ignore]:
         uniq = int(df[col].nunique(dropna=True))
-        # Idée : un numérique avec peu de modalités (p.ex 0/1/2/3) → catégorie déguisée
+        # Un numérique avec peu de modalités → catégorie déguisée
         if 2 <= uniq <= num_discrete_max and (uniq / n if n else 0.0) < id_ratio:
             to_encode_num[col] = f"🔢 Numérique discret (modalités={uniq}) — à encoder"
 
@@ -171,29 +164,33 @@ def run_suggestions() -> None:
     st.divider()
 
     # ---------- Suppression optionnelle du texte libre ----------
-    # NB : cette action ne vectorise pas ; elle aide à préparer un dataset « modélisable » rapide.
+    # (Correction : remplacement des boutons imbriqués par une confirmation explicite)
     to_drop = list(to_vectorize.keys())
     if to_drop:
         st.markdown("### 🗑️ Colonnes candidates à suppression (texte libre / haute cardinalité)")
         with st.expander("🔎 Détails des colonnes concernées"):
             st.code(", ".join(to_drop))
 
-        if st.button("🚮 Préparer la suppression des colonnes", key="sugg_drop_prepare"):
-            st.warning(
-                f"Vous êtes sur le point de supprimer {len(to_drop)} colonne(s) de texte libre. "
-                "Cela **ne crée pas** de vectorisation automatique."
-            )
-            if st.button("✅ Confirmer la suppression", key="sugg_drop_confirm"):
-                try:
-                    df.drop(columns=to_drop, inplace=True, errors="ignore")
-                    st.session_state["df"] = df
-                    save_snapshot(df, suffix="suggestions_cleaned")
-                    log_action("suggestions_cleanup", f"{len(to_drop)} colonnes supprimées (texte libre)")
-                    st.success("✅ Colonnes supprimées. Snapshot sauvegardé.")
-                except Exception as e:
-                    st.error(f"❌ Erreur pendant la suppression : {e}")
+        st.caption(
+            "⚠️ Cette opération **ne crée pas** de vectorisation ; elle sert uniquement "
+            "à alléger le dataset pour un prototypage rapide."
+        )
+        confirm = st.checkbox("Je confirme la suppression des colonnes listées", key="sugg_confirm_drop")
+
+        if st.button("🚮 Supprimer maintenant", type="primary", disabled=not confirm):
+            try:
+                df.drop(columns=to_drop, inplace=True, errors="ignore")
+                st.session_state["df"] = df
+                save_snapshot(df, suffix="suggestions_cleaned")
+                log_action("suggestions_cleanup", f"{len(to_drop)} colonnes supprimées (texte libre)")
+                st.success("✅ Colonnes supprimées. Snapshot sauvegardé.")
+            except Exception as e:
+                st.error(f"❌ Erreur pendant la suppression : {e}")
     else:
         st.info("Aucune colonne candidate à suppression automatique selon ces règles.")
+
+    # ---------- Validation étape EDA ----------
+    validate_step_button("suggestions", context_prefix="sugg_")
 
     # ---------- Footer ----------
     show_footer(
