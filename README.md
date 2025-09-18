@@ -1,175 +1,175 @@
+Presque nickel, mais il y a 4 petites incohérences avec ton code actuel :
+# README 
+
+```markdown
 # 🌸 Datalyzer – Analyse exploratoire et nettoyage intelligent de données
 
-Datalyzer est une application interactive construite avec **Streamlit** pour explorer, nettoyer, analyser et exporter vos données tabulaires (CSV, Excel, etc.). Conçue pour des analyses EDA poussées, elle offre une interface fluide et zen qui guide chaque étape du processus.
+Datalyzer est une application interactive construite avec **Streamlit** pour explorer, nettoyer, analyser et exporter vos données tabulaires. Conçue pour des analyses EDA poussées, elle offre une interface fluide et zen qui guide chaque étape du processus.
 
 ---
 
 ## 🚀 Fonctionnalités clés
 
-- ✅ Import de fichiers CSV ou Excel
+- ✅ Import de fichiers CSV, TXT, Excel, Parquet
 - 🧬 Détection automatique des types de variables
-- 🔍 Analyse exploratoire interactive (types, valeurs manquantes, outliers, stats...)
+- 🔍 Analyse exploratoire interactive (types, valeurs manquantes, outliers, stats, corrélations…)
 - 🧹 Nettoyage automatique : valeurs manquantes, colonnes constantes, faible variance
-- 🧾 Correction manuelle des types (int, float, bool, datetime...)
+- 🧾 Correction manuelle des types (int, float, bool, datetime…)
 - 💡 Suggestions de traitement (encodage, vectorisation, suppression)
-- 🔗 Fusion intelligente de fichiers par clés communes
-- 📈 Analyse multivariée (ACP, clustering, corrélations)
-- 🎯 Analyse ciblée avec croisement variable cible / explicative
-- 🧪 Évaluation de la qualité des données (score global, heatmap, red flags)
-- 💾 Export des données nettoyées dans plusieurs formats (CSV, XLSX, JSON, Parquet)
-- 🕰️ Gestion complète des snapshots (états intermédiaires)
-- 📊 Interface interactive avec **Plotly**, entièrement pilotée depuis **Streamlit**
+- 🔗 Fusion (jointures) par clés communes
+- 📈 Analyse multivariée : **ACP (PCA)**, **K-means**, projections 2D/3D
+- 🎯 Analyse catégorielle : **Cramér’s V**, crosstabs normalisés, barres empilées, boxplots par modalité
+- 🧪 Qualité des données (score global, heatmap, red flags)
+- 💾 Export multi-format avec **sélection de colonnes** et **sous-ensemble de lignes** (filtres ET/OU, échantillon, Top-N)
+- 🕰️ Snapshots (états intermédiaires) — lister, restaurer, supprimer
+- 📊 Interface interactive **Plotly** + **Streamlit**
 
 ---
 
 ## 🗂️ Structure du projet
 
 ```
+
 datalyzer/
-├── app.py                  ← Application principale (navigation Streamlit)
-├── config.py               ← Configuration graphique & thème
-├── sections/               ← Modules fonctionnels de l'application
+├── app.py
+├── config.py
+├── sections/
 │   ├── exploration.py
 │   ├── typage.py
 │   ├── suggestions.py
 │   ├── qualite.py
 │   ├── anomalies.py
 │   ├── multivariee.py
-│   ├── cat_analysis.py
+│   ├── cat\_analysis.py
 │   ├── cible.py
 │   ├── jointures.py
 │   ├── export.py
 │   ├── fichiers.py
 │   └── snapshots.py
 │
-├── utils/                  ← Fonctions utilitaires
-│   ├── eda_utils.py
+├── utils/
+│   ├── eda\_utils.py
 │   ├── filters.py
-│   ├── log_utils.py
-│   └── snapshot_utils.py
+│   ├── log\_utils.py
+│   └── snapshot\_utils.py
 │
-├── data/                   ← Dossiers pour sauvegardes et exports
+├── data/
 │   ├── snapshots/
 │   └── exports/
 │
-├── images/                 ← Illustrations et fonds de page
-├── requirements.txt        ← Dépendances Python
-└── README.md               ← Ce fichier
-```
+├── logs/
+│   └── eda\_actions.log
+├── images/
+├── requirements.txt
+└── README.md
+
+````
 
 ---
 
-## ▶️ Lancement de l'application
+## ▶️ Lancement
 
-### 1. Installation des dépendances
-
+### 1) Installer les dépendances
 ```bash
 pip install -r requirements.txt
-```
+````
 
-### 2. Démarrage de l'application
+### 2) Démarrer
 
 ```bash
 streamlit run app.py
 ```
 
-L'application s’ouvre automatiquement dans votre navigateur par défaut.
+L’app s’ouvre dans votre navigateur.
 
 ---
 
-## 📁 Formats supportés
+## 📁 Formats supportés (import)
 
-- `.csv` (standard)
-- `.xlsx` (Excel)
-- `.json` (en ligne ou objet)
-- `.parquet` (colonnes compressées, recommandé)
+* `.csv`
+* `.txt`
+* `.xlsx` / `.xls`
+* `.parquet`
+
+> Astuce CSV/TXT : détection auto du séparateur (`,` `;` `\t`).
 
 ---
 
 ## 📦 Export multi-format
 
-À tout moment, vous pouvez exporter le fichier nettoyé :
-- en `.csv` classique
-- en `.xlsx` (Excel)
-- en `.json` formaté
-- en `.parquet` (optimisé pour la taille)
+* `.csv` (UTF-8, `utf-8-sig`, `latin-1`, option **gzip**)
+* `.xlsx`
+* `.json` (records, UTF-8, option **gzip**)
+* `.parquet` (option **gzip**)
 
-Un **log d’action** est généré à chaque export dans `logs/`.
-
----
-
-## 🕰️ Snapshots intelligents
-
-Chaque transformation (filtrage, nettoyage, typage, jointure...) peut être **sauvegardée** sous forme de snapshot. Ces snapshots sont listés, restaurables et supprimables à volonté depuis l’interface.
+**Contrôle fin** : choisissez les **colonnes** et les **lignes** à exporter (filtres ET/OU, échantillon aléatoire, Top-N trié, déduplication, suppression des NA).
+Chaque export génère un log dans `logs/eda_actions.log`.
 
 ---
 
-## 🔒 Logs automatiques
+## 🕰️ Snapshots
 
-Chaque action utilisateur déclenche un **log** dans `logs/eda_actions.log`, incluant :
-
-- Date/heure
-- Étape
-- Résumé de la transformation
+Sauvegardez l’état courant des données (après nettoyage, typage, jointure, etc.).
+Tous les snapshots sont listés, prévisualisables, activables et supprimables.
 
 ---
 
-## 📸 Interface graphique enrichie
+## 🔒 Logs
 
-Datalyzer utilise **Streamlit + Plotly** avec :
+Chaque action importante est journalisée dans `logs/eda_actions.log` avec :
 
-- Thème adaptatif et fluide
-- Progression dynamique des étapes
-- Menu latéral personnalisé
-- Affichage par onglets (`st.tabs`)
-- Visualisation interactive (histogrammes, boxplots, scatter, heatmap...)
+* date/heure
+* étape
+* résumé
 
 ---
 
-## 📊 Blocs d’analyse disponibles
+## 📸 Interface
 
-| Bloc | Contenu |
-|------|---------|
-| **Exploration** | Types, NA, stats, outliers, nettoyage |
-| **Typage** | Suggestions + correction |
-| **Suggestions** | Encodage / vectorisation recommandée |
-| **Qualité** | Score, heatmap, vérifications critiques |
-| **Multivariée** | ACP, clustering, projection, Cramér’s V |
-| **Catégorielle** | Boxplots, croisement de modalités |
-| **Cible** | Analyse ciblée d'une variable à expliquer |
-| **Jointures** | Fusion intelligente de fichiers |
-| **Export** | Sélection, format, téléchargement |
-| **Snapshots** | Sauvegardes, chargement, suppression |
+* Thème Streamlit unifié
+* Barre de progression des étapes EDA
+* Onglets (`st.tabs`) par bloc analytique
+* Visualisations interactives (histogrammes, boxplots, scatter, heatmap…)
 
 ---
 
-## 🎨 Thème & Design
+## 📊 Blocs d’analyse
 
-- Couleurs pastel inspirées du Japon zen
-- Illustrations pour chaque bloc (fond personnalisé)
-- Animation douce & feedback visuel
-- Icônes et emojis pour une navigation intuitive
+| Bloc             | Contenu                                                |
+| ---------------- | ------------------------------------------------------ |
+| **Exploration**  | Types, NA, stats, outliers, corrélations, nettoyage    |
+| **Typage**       | Suggestions + corrections interactives                 |
+| **Catégorielle** | **Cramér’s V**, crosstabs %, barres empilées, boxplots |
+| **Multivariée**  | **ACP (PCA)**, **K-means**, projections 2D/3D          |
+| **Cible**        | Analyse d’une variable à expliquer                     |
+| **Jointures**    | Fusion par clés                                        |
+| **Export**       | Sélection colonnes & lignes, formats, compression      |
+| **Snapshots**    | Sauvegardes, chargement, suppression                   |
+| **Suggestions**  | Encodage / vectorisation recommandée                   |
+| **Qualité**      | Score global, heatmap, red flags                       |
 
 ---
 
-## 🧪 Tests recommandés
+## 🧪 Vérifications conseillées
 
-- Vérifiez l’import, les jointures et les exports manuellement
-- Vérifiez les logs dans `logs/eda_actions.log`
-- Vérifiez la création automatique de `snapshots/` et `exports/`
+* Import / jointures / export
+* Fichiers générés dans `data/exports/`
+* Snapshots dans `data/snapshots/`
+* Logs dans `logs/eda_actions.log`
 
 ---
 
 ## 📌 Remarques
 
-- Le projet ne nécessite **aucune base de données ni backend**.
-- L'application fonctionne **100 % localement**, sans connexion externe.
-- L’architecture est **modulaire et extensible** (ajout de blocs, logs, logs visuels, plugins...).
+* Pas de base de données ni backend requis.
+* Fonctionne **100 % localement**.
+* Architecture modulaire (ajout de blocs & logs facile).
 
 ---
 
 ## 👤 Auteur
 
-Ce projet est une initiative personnelle conçue par **Xavier Rousseau**, Data Engineer & Analyst, passionné de qualité des données, visualisation et automatisation.
+Conçu par **Xavier Rousseau** — Data Engineer & Analyst, passionné par la qualité des données, la visualisation et l’automatisation.
 
+````
  
