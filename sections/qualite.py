@@ -20,7 +20,7 @@ from utils.eda_utils import (
 
 from utils.snapshot_utils import save_snapshot
 from utils.log_utils import log_action
-from utils.filters import get_active_dataframe, validate_step_button
+from utils.filters import get_active_dataframe 
 from utils.ui_utils import section_header, show_footer
 
 
@@ -216,8 +216,6 @@ def run_qualite() -> None:
             st.error(f"❌ Erreur pendant la correction : {e}")
     st.divider()
 
-    # ---------- Validation étape EDA ----------
-    validate_step_button("stats", context_prefix="qualite_")
 
     # ---------- Footer ----------
     show_footer(

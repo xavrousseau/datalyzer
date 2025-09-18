@@ -13,9 +13,4 @@ EDA_STEPS = OrderedDict([
     ("extremes",        "Valeurs extrêmes"),
     ("correlations",    "Corrélations"),
     ("cleaning",        "Nettoyage intelligent"),
-    ("anomalies",       "Anomalies"),  
-    ("multivariate",    "Analyse multivariée"),
-    ("categorial",      "Analyse catégorielles"),
-    ("cible",           "Cible"),
-    ("suggestions",      "Suggestions"),
 ])

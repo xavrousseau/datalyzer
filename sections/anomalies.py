@@ -14,7 +14,7 @@ import streamlit as st
 
 from utils.snapshot_utils import save_snapshot
 from utils.log_utils import log_action
-from utils.filters import get_active_dataframe, validate_step_button
+from utils.filters import get_active_dataframe 
 from utils.ui_utils import section_header, show_footer
 
 
@@ -204,9 +204,6 @@ def run_anomalies() -> None:
         if st.button("📝 Journaliser l’analyse"):
             log_action("anomalies_run", f"col={col}, method={method}, param={thr}, n={n_anom}")
             st.toast("🗒️ Analyse journalisée.")
-
-        # ---------- Validation étape EDA ----------
-    validate_step_button("anomalies", context_prefix="anomalies_")
 
 
     # ---- Footer ----

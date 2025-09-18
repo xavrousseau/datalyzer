@@ -27,7 +27,7 @@ from pandas.api.types import (
     is_bool_dtype,
 )
 
-from utils.filters import get_active_dataframe, validate_step_button
+from utils.filters import get_active_dataframe 
 from utils.eda_utils import compute_cramers_v_matrix, plot_boxplots
 from utils.ui_utils import section_header, show_footer
 
@@ -300,8 +300,6 @@ def run_analyse_categorielle() -> None:
                 "(ni numérique, ni catégorielle-like : category/object/string/bool)."
             )
  
-    # ---------- Validation étape EDA ----------
-    validate_step_button("categorial", context_prefix="cat_")
 
     # ---------- Footer ----------
     show_footer(

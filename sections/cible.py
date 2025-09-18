@@ -14,7 +14,7 @@ import plotly.express as px
 import streamlit as st
 import numpy as np
 
-from utils.filters import get_active_dataframe, validate_step_button
+from utils.filters import get_active_dataframe 
 from utils.ui_utils import section_header, show_footer
 from utils.eda_utils import compute_correlation_matrix
 
@@ -300,9 +300,7 @@ def run_cible() -> None:
                 st.plotly_chart(fig_scatter, use_container_width=True)
  
 
-    # ---------- Validation étape EDA ----------
-    validate_step_button("cible", context_prefix="cib_")
-
+ 
     # ---------- Footer ----------
     show_footer(
         author="Xavier Rousseau",

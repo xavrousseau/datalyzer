@@ -18,7 +18,7 @@ from sklearn.preprocessing import StandardScaler
  
 from utils.snapshot_utils import save_snapshot
 from utils.log_utils import log_action
-from utils.filters import get_active_dataframe, validate_step_button
+from utils.filters import get_active_dataframe 
 from utils.ui_utils import section_header, show_footer
 
 
@@ -160,8 +160,14 @@ def run_multivariee() -> None:
 
     if do_impute:
         X = X_raw.apply(pd.to_numeric, errors="coerce")
-        # on retire les colonnes totalement vides
-        X = X.drop(columns=[c for c in X.columns if X[c].isna().all()], errors="ignore")
+
+        # Colonnes 100% NA après coercition -> on les retire
+        all_nan_cols = X.columns[X.isna().all()]
+        if len(all_nan_cols):
+            st.caption("⚠️ Colonnes 100% NA après coercition supprimées : " + ", ".join(map(str, all_nan_cols)))
+            X = X.drop(columns=all_nan_cols, errors="ignore")
+
+        # Imputation moyenne (numérique uniquement)
         X = X.fillna(X.mean(numeric_only=True))
         dropped = 0
     else:
@@ -169,6 +175,17 @@ def run_multivariee() -> None:
         dropped = len(X_raw) - len(X)
         if dropped:
             st.caption(f"ℹ️ {dropped} ligne(s) supprimée(s) pour valeurs manquantes sur les variables retenues.")
+
+    # Variables retirées par la préparation (ex. 100% NA)
+    removed_vars = [c for c in cols_selected if c not in X.columns]
+    if removed_vars:
+        st.caption("⚠️ Variables retirées pendant la préparation : " + ", ".join(map(str, removed_vars)))
+
+    # (Optionnel) Alerte sur les colonnes à variance nulle (peu utiles en PCA)
+    zero_var_cols = X.std(numeric_only=True) == 0
+    zero_var_cols = [c for c, z in zero_var_cols.items() if z]
+    if zero_var_cols:
+        st.caption("ℹ️ Colonnes à variance nulle (faible apport en PCA) : " + ", ".join(map(str, zero_var_cols)))
 
     # Garde-fous
     if X.shape[0] == 0 or X.shape[1] == 0:
@@ -247,28 +264,29 @@ def run_multivariee() -> None:
     # (Mini) biplot : charges des variables sur PC1/PC2
     with st.expander("📎 Biplot (charges variables sur PC1/PC2)", expanded=False):
         if n_comp >= 2:
-            loadings = pd.DataFrame(
-                pca.components_[:2, :].T,
-                index=cols_selected,
-                columns=["PC1", "PC2"],
+            # ⚠️ Utiliser les colonnes réellement passées à la PCA (après nettoyage)
+            feature_names = list(X_std.columns)  # pas cols_selected !
+            comps = pca.components_[:2, :]       # shape = (2, n_features)
+
+            # Garde-fou (au cas où) : s'assurer que le nb de features colle
+            if comps.shape[1] != len(feature_names):
+                min_feats = min(comps.shape[1], len(feature_names))
+                comps = comps[:, :min_feats]
+                feature_names = feature_names[:min_feats]
+
+            loadings = pd.DataFrame(comps.T, index=feature_names, columns=["PC1", "PC2"])
+
+            fig_load = px.scatter(
+                loadings, x="PC1", y="PC2",
+                text=loadings.index,
+                title="Charges (PC1/PC2)"
             )
-            fig_load = px.scatter(loadings, x="PC1", y="PC2", text=loadings.index, title="Charges (PC1/PC2)")
             fig_load.update_traces(textposition="top center")
             st.plotly_chart(fig_load, use_container_width=True)
             st.caption("Les charges indiquent la contribution directionnelle des variables aux composantes.")
         else:
             st.info("ℹ️ Biplot indisponible avec moins de 2 composantes.")
 
-    # Sauvegarde éventuelle des scores dans le DF actif
-    if st.checkbox("➕ Ajouter les scores PCA au DataFrame actif", value=False):
-        for c in scores.columns:
-            df.loc[scores.index, c] = scores[c]
-        st.session_state["df"] = df
-        save_snapshot(df, suffix=f"pca_{n_comp}c")
-        log_action("pca_add_scores", f"{n_comp} composantes ajoutées")
-        st.success("✅ Scores PCA ajoutés au DataFrame actif.")
-
-    st.divider()
 
     # ============================== K-MEANS ====================================
     # ✅ Section K-means (UI) robuste + typage Int64 des labels
@@ -340,9 +358,6 @@ def run_multivariee() -> None:
             except Exception as e:
                 st.error(f"❌ Erreur K-means : {e}")
 
-
-    # ---------- Validation étape EDA ----------
-    validate_step_button("multivariate", context_prefix="multi_")
 
     # ---------- Footer ----------
     show_footer(

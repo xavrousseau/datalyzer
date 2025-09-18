@@ -13,7 +13,7 @@ import streamlit as st
  
 from utils.snapshot_utils import save_snapshot
 from utils.log_utils import log_action
-from utils.filters import get_active_dataframe, validate_step_button
+from utils.filters import get_active_dataframe 
 from utils.ui_utils import section_header, show_footer
 
 
@@ -157,9 +157,7 @@ def run_typage() -> None:
         "La validation de l’étape *Types de variables* se fait depuis l’onglet **Exploration → Types**."
     )
 
-    # ---------- Validation étape EDA ----------
-    validate_step_button("typing", context_prefix="typage_")
-
+ 
     # ---------- Footer ----------
     show_footer(
         author="Xavier Rousseau",
