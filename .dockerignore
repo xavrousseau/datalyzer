@@ -1,61 +1,84 @@
-# =============================================================================
-# .dockerignore — Datalyzer
-# Objectif : réduire la taille des builds Docker et accélérer la copie
-#            en excluant tout ce qui n’est pas nécessaire à l’image.
-# =============================================================================
+# ==========================================
+# 📂 GITIGNORE — Projet Pipeline Hybride
+# ==========================================
 
-# ---------------------------------------------------------------------------
-# 1) Cache Python et fichiers temporaires
-# ---------------------------------------------------------------------------
+# 🔒 Fichiers sensibles
+.env
+
+# 🐍 Python (caches, venv, artefacts)
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
-
-# Logs et fichiers runtime
-*.log
-*.pid
-*.db
-
-# ---------------------------------------------------------------------------
-# 2) Données locales (on monte /app/data via volumes, inutile en image)
-# ---------------------------------------------------------------------------
-data/uploads/
-data/exports/
-logs/
-bat/
-old/
-
-# Fichiers de travail / résultats d’analyse
-*.sqlite3
-*.parquet
-*.csv
-
-# ---------------------------------------------------------------------------
-# 3) Environnements et config machine locale
-# ---------------------------------------------------------------------------
-.env                # ton fichier d’environnement local (jamais dans l’image)
-.venv/              # environnement virtuel Python local
-env/                # parfois utilisé
-venv/               # idem
-
-# ---------------------------------------------------------------------------
-# 4) Notebooks / checkpoints
-# ---------------------------------------------------------------------------
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
 .ipynb_checkpoints/
-*.ipynb
+.mypy_cache/
+.pytype/
+.pytest_cache/
 
-# ---------------------------------------------------------------------------
-# 5) Système / versionnement
-# ---------------------------------------------------------------------------
-.git/
-.gitignore
-.gitattributes
+# 📁 Répertoires temporaires & sauvegardes
+docs/              # Documentation générée localement
+old/               # Sauvegardes anciennes
+old_*              # Autres versions archivées
+tests/             # Tests unitaires internes non versionnés
+bat/               # Scripts batch temporaires
+jars/              # Dépendances Java locales
 
-# ---------------------------------------------------------------------------
-# 6) Autres fichiers lourds ou non pertinents
-# ---------------------------------------------------------------------------
-.DS_Store           # macOS
-Thumbs.db           # Windows
-*.bak               # sauvegardes
-*.swp               # fichiers swap Vim
+# 📦 Archives & binaires
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.exe
+*.bat
+*.sh
+*.pid
+
+# 🐳 Docker (images, conteneurs exportés)
+*.tar
+
+# 📑 Éditeurs & IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# 🖥️ OS (fichiers cachés auto-générés)
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 🎨 Sorties générées (visuels, rapports)
+graphique_*.png
+résumé_*.csv
+
+# === Streamlit ===
+.streamlit/secrets.toml   # Secrets non versionnés
+.streamlit/*.log          # Logs Streamlit
+
+# === Données lourdes / temporaires ===
+*.parquet
+*.feather
+*.h5
+*.db
+*.sqlite
+*.csv
+*.xlsx
+
+# Autoriser des échantillons légers pour démo/tests
+!data/samples/**
+!examples/**
+
+# === Logs / exports ===
+logs/
+exports/
+*.log
+
+# === Node / Frontend (si présent) ===
+node_modules/
+dist/
+build/
