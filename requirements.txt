@@ -1,32 +1,41 @@
+# ========================================================================
+# requirements.txt — Datalyzer
+# Application Streamlit pour l’analyse exploratoire et le nettoyage de données
+# ========================================================================
+
 # === Core Streamlit App ===
-streamlit>=1.30,<2.0
-pandas>=2.0
-numpy>=1.24
-plotly>=5.18
-requests>=2.31
+streamlit>=1.30,<2.0   # Framework web interactif
+pandas>=2.0            # Manipulation et analyse de données tabulaires
+numpy>=1.24            # Calcul numérique (vecteurs, matrices)
+plotly>=5.18           # Visualisations interactives intégrées à Streamlit
 
 # === Analyse & machine learning ===
-scikit-learn>=1.3
-scipy>=1.11
-ydata-profiling>=4.0
-
-# === Visualisation complémentaire ===
-matplotlib>=3.7
-seaborn>=0.12        # (optionnel mais souvent utilisé)
+scikit-learn>=1.3      # ACP (PCA), clustering K-means, utilitaires ML
+scipy>=1.11            # Statistiques robustes (z-score, percentiles, tests)
 
 # === Lecture & export multi-format ===
-openpyxl>=3.1        # Excel (.xlsx)
-pyarrow>=14.0        # Parquet (.parquet)
-python-snappy>=0.6   # Compression parquet Snappy
-xlsxwriter>=3.1      # Optionnel, Excel stylé
-# fastparquet>=2023.8 # Optionnel si tu veux l’alternative à pyarrow
+openpyxl>=3.1          # Lecture/écriture fichiers Excel (.xlsx)
+xlsxwriter>=3.1        # Écriture Excel stylisée et rapide (engine alternatif)
+pyarrow>=14.0          # Lecture/écriture Parquet (.parquet)
+python-snappy>=0.6     # Compression Parquet (Snappy, optionnel mais conseillé)
 
 # === Images & UI ===
-Pillow>=10.0         # Pour chargement/redimensionnement d’images
+Pillow>=10.0           # Chargement et encodage d’images (bannières, icônes)
 
 # === Suivi, logs et ressources système ===
-loguru>=0.7
-psutil>=5.9          # Pour surveiller mémoire/CPU
+loguru>=0.7            # Journalisation structurée des actions utilisateur
+psutil>=5.9            # (Optionnel) Monitoring CPU/RAM si affichage système
 
-# === Divers (utiles dans data science) ===
-tqdm>=4.65           # Barres de progression (optionnel)
+# === Optionnels (désactivés par défaut) ===
+# ydata-profiling>=4.0   # Profiling automatique complet (rapport HTML/PDF)
+# seaborn>=0.12          # Visualisations statiques (tu es déjà full Plotly)
+# requests>=2.31         # Téléchargements HTTP si ajout de fetchs externes
+# tqdm>=4.65             # Barres de progression CLI
+# fastparquet>=2023.8    # Alternative à PyArrow pour Parquet
+
+# ========================================================================
+# Notes :
+# - Ce fichier liste les versions compatibles et stables.
+# - Pour une démo stable, figer les versions exactes avec :
+#       pip freeze > requirements-lock.txt
+# ========================================================================
