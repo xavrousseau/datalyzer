@@ -131,7 +131,7 @@ def run_analyse_categorielle() -> None:
         title="Analyse catégorielle",
         subtitle="Corrélations et croisements avec une cible.",
         section="analyse",
-        emoji="📊",
+        emoji="",
     )
 
     # ---------- Fichier actif ----------

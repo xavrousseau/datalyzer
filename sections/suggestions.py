@@ -56,7 +56,7 @@ def run_suggestions() -> None:
         title="Suggestions",
         subtitle="Colonnes discrètes à encoder, texte libre à vectoriser.",
         section="analyse",
-        emoji="💡",
+        emoji="",
     )
 
     # ---------- DataFrame actif ----------

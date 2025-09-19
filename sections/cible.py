@@ -56,7 +56,7 @@ def run_cible() -> None:
         title="Analyse cible",
         subtitle="Corrélations, regroupements, visualisations autour d’une cible",
         section="cible",   # bannière dédiée si définie dans config.SECTION_BANNERS
-        emoji="🎯",
+        emoji="",
     )
 
     # ---------- DataFrame actif ----------

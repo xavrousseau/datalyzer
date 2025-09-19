@@ -123,7 +123,7 @@ def run_anomalies() -> None:
         title="Anomalies",
         subtitle="Détecter des valeurs atypiques par z-score, IQR ou MAD.",
         section="exploration",  # réutilise la bannière de l’exploration si tu veux
-        emoji="🚧",
+        emoji="",
     )
 
     df, nom = get_active_dataframe()
