@@ -89,7 +89,6 @@ def mark_step_done(step: str, custom_name: Optional[str] = None, *, df_key: str 
     """
     st.session_state.setdefault("validation_steps", {})
 
-    # Déjà validée ? On ne re-fait pas l’opération (évite le spam).
     if st.session_state["validation_steps"].get(step):
         return
 
@@ -147,7 +146,7 @@ def get_columns_by_dtype(df: pd.DataFrame, dtype: str = "number") -> List[str]:
     Renvoie la liste des colonnes correspondant au type spécifié.
     Exemples de `dtype` : 'number', 'object', 'datetime', 'category', etc.
     """
-    # Pandas accepte 'datetime64[ns]' / 'number' / 'object' … laissons la souplesse.
+    
     return df.select_dtypes(include=dtype).columns.tolist()
 
 

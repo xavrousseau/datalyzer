@@ -204,11 +204,3 @@ def run_anomalies() -> None:
         if st.button("📝 Journaliser l’analyse"):
             log_action("anomalies_run", f"col={col}, method={method}, param={thr}, n={n_anom}")
             st.toast("🗒️ Analyse journalisée.")
-
-
-    # ---- Footer ----
-    show_footer(
-        author="Xavier Rousseau",
-        site_url="https://xavrousseau.github.io/",
-        version="1.0",
-    )

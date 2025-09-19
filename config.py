@@ -12,8 +12,7 @@ import streamlit as st
 # --- Métadonnées de l'application ---
 APP_NAME: str = "Datalyzer"
 SECTIONS_DIR: str = "sections"
-
-# NB : garde ce chemin s'il est valide ; sinon bascule-la sous "static/images/sidebars/"
+ 
 LOGO_PATH: str = "images/sidebars/japanese-temple.png"
 
 # --- Palette sombre (cohérente avec assets/style_dark.css) ---
@@ -29,10 +28,7 @@ PALETTE_ZEN: dict[str, str] = {
 def color(key: str, default: str) -> str:
     """Accès tolérant aux couleurs (évite KeyError et stabilise les sections)."""
     return PALETTE_ZEN.get(key, default)
-
-# --- Étapes EDA ---
-# ⚠️ Source unique : utils/steps.py
-# (on *retire* EDA_STEPS d'ici pour éviter tout décalage de clés / doublon)
+ 
 
 # --- Bannières & UI par section ---
 BANNER_SIZE: tuple[int, int] = (900, 220)

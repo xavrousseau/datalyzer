@@ -48,7 +48,7 @@ routes = {
 # === Barre latérale de navigation ===
 def nav_menu():
     with st.sidebar:
-        # --- Image décorative (remplace l'ancien <img src="...">) ---
+        # --- Image décorative ---
         st.image(
             "static/images/sidebars/japanese-temple.png",
             width=200,

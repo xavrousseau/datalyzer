@@ -9,13 +9,6 @@ FROM python:3.10-slim
 # Répertoire de travail
 WORKDIR /app
 
-# (Optionnel) Dépendances système — laisse commenté si tout marche.
-# Utile si certaines libs Python (pandas/pyarrow/openpyxl) exigent des paquets OS.
-# RUN apt-get update && apt-get install -y --no-install-recommends \
-#     build-essential \
-#     libatlas-base-dev \
-#     && rm -rf /var/lib/apt/lists/*
-
 # Variables d’environnement (qualité de vie)
 ENV PYTHONDONTWRITEBYTECODE=1 \ 
     PYTHONUNBUFFERED=1
