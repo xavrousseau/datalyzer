@@ -75,6 +75,9 @@ datalyzer/
 ├── app.py                 # Point d’entrée Streamlit
 ├── config.py              # Paramètres globaux (thème, couleurs, constantes)
 │
+├── assets/               # Ressources utilisées par l’app (au runtime)
+│   └── style_dark.css    # Feuille de style custom injectée dans Streamlit
+│
 ├── sections/              # Pages principales
 │   ├── home.py            # Page d’accueil
 │   ├── fichiers.py        # Import CSV/TXT/Excel/Parquet + snapshots
