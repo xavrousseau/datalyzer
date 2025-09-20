@@ -99,8 +99,7 @@ def run_home() -> None:
 
 
     # ---------- Trois colonnes ----------
-    # Astuce : sur des écrans étroits, Streamlit empile les colonnes ;
-    #           évite d’y mettre des contenus trop longs.
+
     col1, col2, col3 = st.columns(3)
 
     # Carte 1 : panorama des fonctionnalités
@@ -131,7 +130,6 @@ def run_home() -> None:
             </ul>
             """,
         )
-
     # Carte 3 : analytique et qualité
     with col3:
         ui_card(

@@ -6,9 +6,9 @@
 #   - Matrice de Cramér’s V avec seuil et limite de cardinalité
 #   - Croisements cible↔explicative (num→boxplot, cat→crosstab + bar empilée)
 #   - Garde-fous sur colonnes disponibles et matrices vides
-# Auteur   : Xavier Rousseau — commentaires & docs pédagogiques ajoutés
+# Auteur   : Xavier Rousseau 
 # ============================================================
-
+ 
 from __future__ import annotations
 
 from typing import Any
@@ -27,32 +27,22 @@ from pandas.api.types import (
     is_bool_dtype,
 )
 
-from utils.filters import get_active_dataframe 
+# Utilitaires internes du projet
+from utils.filters import get_active_dataframe
 from utils.eda_utils import compute_cramers_v_matrix, plot_boxplots
 from utils.ui_utils import section_header, show_footer
 
 
 # =============================================================================
-# Helpers de typage & de labellisation — petites briques pures et testables
+# Helpers — typage, libellés, et styling « safe » sans Matplotlib
 # =============================================================================
 
 def _is_categorical_like(s: pd.Series) -> bool:
-    """Indique si une série peut être traitée comme **catégorielle**.
+    """Retourne True si la série *peut* être traitée comme **catégorielle**.
 
-    Sont considérées *catégorielles-like* :
-      - dtype `category` (pandas),
-      - objets/strings (`object`, `string`),
-      - booléens (`bool`).
-
-    Pourquoi ne pas se limiter à `category` ?
-      - Dans la vraie vie, beaucoup de colonnes qualitatives arrivent en `object`
-        (ex. lecture CSV), et il serait frustrant de les exclure.
-
-    Args:
-        s: Série candidate.
-
-    Returns:
-        True si exploitable comme catégorielle dans nos vues.
+    On prend large : dtype `category`, `object`, `string`, ou `bool`.
+    Pourquoi ? En pratique, beaucoup de colonnes qualitatives arrivent en `object`
+    (ex. lecture CSV). Les exclure serait frustrant.
     """
     return (
         is_categorical_dtype(s)
@@ -63,21 +53,14 @@ def _is_categorical_like(s: pd.Series) -> bool:
 
 
 def _labelize(x: Any) -> str:
-    """Transforme un libellé (index/colonne/valeur) en **chaîne sûre**.
+    """Transforme un libellé quelconque en **chaîne sûre** pour l'affichage.
 
-    - Remplace `None` et `NaN` par le symbole `∅` (facile à repérer visuellement).
-    - Retourne systématiquement un `str`, JSON‑safe pour Streamlit/Plotly.
-
-    Args:
-        x: Valeur quelconque devant servir d'étiquette.
-
-    Returns:
-        Chaîne nettoyée et non nulle.
+    - Remplace `None` et `NaN` par le symbole `∅` (repérable visuellement).
+    - Retourne toujours un `str` compatible JSON/Plotly/Streamlit.
     """
     if x is None:
         return "∅"
     try:
-        # détecter NaN float
         if isinstance(x, float) and np.isnan(x):
             return "∅"
     except Exception:
@@ -86,21 +69,29 @@ def _labelize(x: Any) -> str:
 
 
 def _sanitize_index_and_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """Retourne une **copie** du DataFrame avec index/colonnes stringifiés.
+    """Retourne une **copie** stringifiée pour éviter les soucis d'index/colonnes.
 
-    Objectif : éviter les erreurs du type « Unexpected token 'N' ... » côté
-    Streamlit lorsque des `NaN`/`None` se glissent dans les noms d'index/de colonnes.
-
-    Args:
-        df: Table d'entrée potentiellement avec NaN/None dans index/colonnes.
-
-    Returns:
-        Copie avec des noms propres (string) et un `index.name` explicite.
+    Objectif : éviter les erreurs JSON côté Streamlit si des `NaN`/`None` se glissent
+    dans les noms d'index ou de colonnes.
     """
     out = df.copy()
     out.index = pd.Index([_labelize(i) for i in out.index], name=out.index.name or "index")
     out.columns = pd.Index([_labelize(c) for c in out.columns], name=out.columns.name)
     return out
+
+
+def _style_bg_gradient_safe(df: pd.DataFrame, cmap: str = "Purples"):
+    """Applique un dégradé de fond via `pandas.Styler.background_gradient` **si possible**.
+
+    Cette méthode nécessite **Matplotlib**. Sur Streamlit Cloud (ou env minimal),
+    Matplotlib peut être absent. Dans ce cas, on renvoie le DataFrame tel quel
+    (pas de style, mais surtout **pas de crash**).
+    """
+    try:
+        import matplotlib  # noqa: F401 - simple test de présence
+        return df.style.background_gradient(cmap=cmap)
+    except Exception:
+        return df
 
 
 # =============================================================================
@@ -111,22 +102,18 @@ def run_analyse_categorielle() -> None:
     """Affiche l'atelier d'analyse des variables catégorielles.
 
     Deux volets complémentaires :
-      1) **Corrélations** entre variables catégorielles via la matrice de Cramér’s V.
-         - Filtrage par seuil.
-         - Limitation de la cardinalité (éviter les explosions de dimensions).
-         - Heatmap optionnelle pour un aperçu global.
+      1) **Corrélations** entre variables catégorielles (matrice de Cramér's V),
+         avec seuil, limitation de cardinalité et heatmap optionnelle.
+      2) **Croisements** avec une **cible** :
+         - Cible **numérique** → *boxplots* par catégorie explicative.
+         - Cible **catégorielle-like** → *crosstab* normalisé (%) + *barres empilées*.
 
-      2) **Croisements** avec une variable **cible** :
-         - Si la cible est **numérique** → *boxplots* par catégorie explicative (distribution).
-         - Si la cible est **catégorielle-like** → *crosstab* normalisé (%, par ligne)
-           + *barres empilées*.
-
-    Design & robustesse :
-      - Détections de type tolérantes (catégoriel "large").
-      - Nettoyage des libellés pour compatibilité JSON.
-      - Garde-fous quand matrices/plots seraient vides.
+    Principes de robustesse :
+      - Détection de type tolérante (catégoriel « large »).
+      - Libellés nettoyés pour compatibilité JSON.
+      - Garde-fous si matrices ou jeux sont vides.
     """
-    # ---------- En-tête unifiée ----------
+    # ---------- En-tête ----------
     section_header(
         title="Analyse catégorielle",
         subtitle="Corrélations et croisements avec une cible.",
@@ -143,31 +130,34 @@ def run_analyse_categorielle() -> None:
     # ---------- Détection des colonnes catégorielles ----------
     # On prend large : object/category/string/bool
     cat_cols = df.select_dtypes(include=["object", "category", "string", "boolean"]).columns.tolist()
-    if len(cat_cols) < 1:
+    if not cat_cols:
         st.info("❗ Aucune variable catégorielle détectée.")
         return
 
     # ---------- Onglets ----------
     tab1, tab2 = st.tabs(["🔗 Corrélations (Cramér’s V)", "🎯 Cible par variable"])
 
-    # ======================================================================
+    # ==================================================================
     # Onglet 1 — Corrélations (Cramér’s V)
-    # ======================================================================
+    # ==================================================================
     with tab1:
         st.markdown("### 🔗 Corrélations entre variables catégorielles (Cramér’s V)")
 
-        # Paramètres de calcul/affichage (placés dans un expander pour aérer l'UI)
+        # Paramètres (expander pour aérer l'UI)
         with st.expander("⚙️ Paramètres"):
             c1, c2 = st.columns(2)
             min_corr = c1.slider("Seuil d'affichage (Cramér ≥)", 0.0, 1.0, 0.3, 0.05)
             max_levels = c2.number_input(
                 "Max modalités par variable (pour crosstabs)",
-                min_value=2, max_value=200, value=50, step=1,
-                help="Les colonnes au-delà de ce seuil sont ignorées pour éviter des tables trop volumineuses."
+                min_value=2,
+                max_value=200,
+                value=50,
+                step=1,
+                help="Les colonnes au-delà de ce seuil sont ignorées pour éviter des tables trop volumineuses.",
             )
             show_full = st.checkbox("Afficher la matrice complète (non filtrée)", value=False)
 
-        # Calcul de la matrice — `compute_cramers_v_matrix` doit gérer les cardinalités
+        # Calcul de la matrice — la fonction utilitaire gère les cardinalités
         try:
             cramers_df = compute_cramers_v_matrix(df[cat_cols], max_levels=max_levels)
         except Exception as e:
@@ -177,37 +167,40 @@ def run_analyse_categorielle() -> None:
         if cramers_df.empty:
             st.info("Aucune matrice exploitable (trop peu de colonnes ou cardinalités trop élevées).")
         else:
-            # On ignore la diagonale pour le filtrage par seuil (corrélation parfaite avec soi-même)
+            # On ignore la diagonale (corrélation parfaite avec soi-même) pour le filtrage
             cramers_nodiag = cramers_df.copy()
             np.fill_diagonal(cramers_nodiag.values, np.nan)
 
             if show_full:
-                st.dataframe(cramers_df.style.background_gradient(cmap="Purples"), use_container_width=True)
+                st.dataframe(_style_bg_gradient_safe(cramers_df), use_container_width=True)
             else:
                 filtered = cramers_nodiag.where(cramers_nodiag >= min_corr)
                 filtered = filtered.dropna(axis=0, how="all").dropna(axis=1, how="all")
                 if filtered.empty:
                     st.info(f"Aucune paire avec Cramér’s V ≥ {min_corr}.")
                 else:
-                    st.dataframe(filtered.style.background_gradient(cmap="Purples"), use_container_width=True)
+                    st.dataframe(_style_bg_gradient_safe(filtered), use_container_width=True)
 
-            # Heatmap optionnelle : utile pour une vue macro instantanée
+            # Heatmap optionnelle : vue macro instantanée
             if st.checkbox("Afficher une heatmap (aperçu global)"):
-                fig = px.imshow(
-                    cramers_df,
-                    color_continuous_scale="Purples",
-                    zmin=0,
-                    zmax=1,
-                    aspect="auto",
-                    origin="lower",
-                    title="Matrice de Cramér’s V (aperçu)",
-                )
-                fig.update_layout(margin=dict(t=40, l=20, r=20, b=20))
-                st.plotly_chart(fig, use_container_width=True)
+                try:
+                    fig = px.imshow(
+                        cramers_df,
+                        color_continuous_scale="Purples",
+                        zmin=0,
+                        zmax=1,
+                        aspect="auto",
+                        origin="lower",
+                        title="Matrice de Cramér’s V (aperçu)",
+                    )
+                    fig.update_layout(margin=dict(t=40, l=20, r=20, b=20))
+                    st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    st.warning(f"Heatmap indisponible : {e}")
 
-    # ======================================================================
+    # ==================================================================
     # Onglet 2 — Croisement avec une variable cible
-    # ======================================================================
+    # ==================================================================
     with tab2:
         st.markdown("### 🎯 Analyse d’une variable cible")
 
@@ -222,22 +215,20 @@ def run_analyse_categorielle() -> None:
 
         explicative = st.selectbox("📂 Variable explicative (catégorielle)", cat_cols_filtered)
 
-        # Typage de la cible — on autorise deux familles : numérique OU catégorielle-like
+        # Typage de la cible — deux familles autorisées : numérique OU catégorielle-like
         cible_is_num = is_numeric_dtype(df[cible])
         cible_is_cat = _is_categorical_like(df[cible])
 
         # ---- Cas 2.a) Cible numérique → boxplot num↔cat ----
         if cible_is_num:
             st.markdown("#### 📉 Boxplot (cible numérique par catégorie explicative)")
-
             try:
-                # Fonction utilitaire (peut retourner None si impossible)
-                fig = plot_boxplots(df, cible, explicative)
+                fig = plot_boxplots(df, cible, explicative)  # utilitaire projet
             except Exception:
                 fig = None
 
             if fig is None:
-                # Fallback robuste : coercition en numérique + drop des NaN
+                # Fallback : coercition en numérique + drop des NaN
                 y = pd.to_numeric(df[cible], errors="coerce")
                 x = df[explicative].astype("string")
                 data = pd.DataFrame({explicative: x, cible: y}).dropna(subset=[cible])
@@ -260,10 +251,10 @@ def run_analyse_categorielle() -> None:
         elif cible_is_cat:
             st.markdown("#### 📊 Répartition croisée normalisée (par ligne)")
 
-            # `dropna=False` pour conserver une colonne dédiée aux valeurs manquantes de la cible.
+            # `dropna=False` : on conserve une colonne dédiée aux valeurs manquantes de la cible.
             cross = pd.crosstab(df[explicative], df[cible], normalize="index", dropna=False).round(3)
 
-            # Étape clé : stringifier labels pour compatibilité JSON/Plotly/Streamlit
+            # Stringifier labels pour compatibilité JSON/Plotly/Streamlit
             cross = _sanitize_index_and_columns(cross)
 
             st.dataframe(cross, use_container_width=True)
@@ -299,11 +290,6 @@ def run_analyse_categorielle() -> None:
                 "❌ La variable cible sélectionnée n’est pas exploitable ici "
                 "(ni numérique, ni catégorielle-like : category/object/string/bool)."
             )
- 
 
     # ---------- Footer ----------
-    show_footer(
-        author="Xavier Rousseau",
-        site_url="https://xavrousseau.github.io/",
-        version="1.0",
-    )
+    show_footer(author="Xavier Rousseau", site_url="https://xavrousseau.github.io/", version="1.0")

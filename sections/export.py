@@ -3,7 +3,7 @@
 # Objectif : Export des données avec sélection de colonnes ET de lignes,
 #            format, logs, snapshot et téléchargement
 # Version  : enrichie (filtres ET/OU, échantillon, top-N, dédup, NA)
-# Auteur   : Xavier Rousseau — commentaires & docs pédagogiques ajoutés
+# Auteur   : Xavier Rousseau 
 # ============================================================
 
 from __future__ import annotations
