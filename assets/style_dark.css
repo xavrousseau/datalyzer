@@ -123,3 +123,44 @@ details {
 footer, .css-qri22k {
     display: none;
 }
+
+/* ============================================================
+   DATALYZER — Mise en page responsive fluide
+   (supprime la largeur fixe de Streamlit et plafonne par confort)
+   ============================================================ */
+
+:root {
+    --page-max: 1280px;   /* largeur max par défaut (desktop classique) */
+    --gutter: 1.25rem;    /* marges latérales (air autour du contenu) */
+}
+
+/* Conteneur principal Streamlit */
+main .block-container {
+    width: 100% !important;
+    max-width: var(--page-max) !important;
+    padding-left: var(--gutter);
+    padding-right: var(--gutter);
+}
+
+/* Plafond élargi sur très grands écrans */
+@media (min-width: 1600px) {
+    :root { --page-max: 1440px; }
+}
+@media (min-width: 1900px) {
+    :root { --page-max: 1600px; }
+}
+
+/* Sécurité : tes wrappers éventuels */
+.wrapper, .content, .inner {
+    width: 100%;
+    max-width: var(--page-max);
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: var(--gutter);
+    padding-right: var(--gutter);
+}
+
+/* Typo : limite longueur de ligne pour lisibilité */
+p, .lead, .card .text {
+    max-width: 72ch;
+}

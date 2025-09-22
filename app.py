@@ -1,15 +1,17 @@
 # ============================================================
 # Fichier : app.py
 # Objectif : Point d’entrée principal de l’application Datalyzer
-# Version : sombre uniquement, stable, compatible Docker/Streamlit
-# Auteur : Xavier Rousseau
+# Version  : sombre uniquement, stable, compatible Docker/Streamlit
+# Auteur   : Xavier Rousseau
 # ============================================================
 
 import streamlit as st
+
+# --- Config & gestion d'état ---
 from config import configure_app
 from utils.state_manager import init_session_state, set_state
 
-# === Import des modules fonctionnels ===
+# --- Sections principales ---
 from sections.home import run_home
 from sections.fichiers import run_chargement
 from sections.jointures import run_jointures
@@ -23,13 +25,29 @@ from sections.cat_analysis import run_analyse_categorielle
 from sections.cible import run_cible
 from sections.suggestions import run_suggestions
 
-# === Initialisation de l'état global (session) ===
+
+# ============================================================
+# 1) CONFIGURATION GLOBALE
+# ============================================================
+
+st.set_page_config(
+    page_title="Datalyzer",
+    page_icon=":shinto_shrine:",
+    layout="wide",                 # mode large → responsive
+    initial_sidebar_state="expanded"
+)
+
+# Init session (dictionnaire interne pour conserver l’état)
 init_session_state()
 
-# === Configuration globale de l'application ===
+# Configuration app (styles globaux, couleurs, etc.)
 configure_app()
 
-# === Dictionnaire de navigation : nom → fonction associée ===
+
+# ============================================================
+# 2) ROUTES — dictionnaire nom → fonction associée
+# ============================================================
+
 routes = {
     "Accueil": run_home,
     "Chargement": run_chargement,
@@ -42,23 +60,28 @@ routes = {
     "Analyse multivariée": run_multivariee,
     "Analyse catégorielle": run_analyse_categorielle,
     "Analyse cible": run_cible,
-    "Suggestions": run_suggestions
+    "Suggestions": run_suggestions,
 }
 
-# === Barre latérale de navigation ===
+
+# ============================================================
+# 3) BARRE LATÉRALE
+# ============================================================
+
 def nav_menu():
+    """Affiche le menu latéral avec logo, navigation et signature."""
     with st.sidebar:
-        # --- Image décorative ---
+        # --- Logo ou image décorative ---
         st.image(
             "static/images/sidebars/japanese-temple.png",
-            width=200,
-            caption=None
+            width=200
         )
 
         st.markdown("---")
 
-        # --- Style réduit pour le sélecteur de pages ---
-        st.markdown("""
+        # --- Style du selecteur de pages (CSS inline) ---
+        st.markdown(
+            """
             <style>
                 div[data-baseweb="select"] span {
                     font-size: 14px !important;
@@ -68,12 +91,15 @@ def nav_menu():
                     font-weight: 600;
                 }
             </style>
-        """, unsafe_allow_html=True)
+            """,
+            unsafe_allow_html=True
+        )
 
         # --- Navigation principale ---
         st.markdown("#### Navigation")
         module_names = list(routes.keys())
         default_page = st.session_state.get("page", "Accueil")
+
         selected_module = st.selectbox(
             "Choisissez une section",
             module_names,
@@ -81,7 +107,7 @@ def nav_menu():
         )
         set_state("page", selected_module)
 
-        # --- Signature bas de menu ---
+        # --- Signature ---
         st.markdown("---")
         st.markdown(
             "<p style='text-align:center; font-size:12px; color:gray;'>"
@@ -89,10 +115,15 @@ def nav_menu():
             unsafe_allow_html=True
         )
 
-# === Affichage du menu latéral ===
+
+# ============================================================
+# 4) ROUTAGE
+# ============================================================
+
+# Menu latéral
 nav_menu()
 
-# === Exécution de la page sélectionnée ===
+# Page active
 active_page = st.session_state.get("page", "Accueil")
 selected_function = routes.get(active_page)
 
