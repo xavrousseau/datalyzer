@@ -1,369 +1,275 @@
 /* ============================================================================
-   DATALYZER — Thème 
-   But : UI sobre, zen, lisible. Sombre par défaut, clair via prefers-color-scheme.
+   DATALYZER — Thème Streamlit (sombre par défaut, clair via prefers-color-scheme)
+   Objectif : UI sobre, zen, lisible. Robuste aux changements de classes Streamlit.
    ----------------------------------------------------------------------------
-   Structure :
-   1) Base sombre (par défaut)
-   2) Layout responsive (plafond fluide)
-   3) Mode clair (overrides @media)
-   4) Patch light (widgets Streamlit récalcitrants)
-   5) Patches de robustesse (version-agnostic Streamlit)
+   Plan :
+   1) Variables & base (dark)
+   2) Layout responsive (largeur max / gouttières)
+   3) Composants (inputs, boutons, cartes, onglets, etc.)
+   4) Mode clair (overrides fiables)
+   5) Patches de robustesse (sélecteurs stables, a11y)
 ============================================================================ */
 
-/* ========== 1) THÈME SOMBRE — BASE ======================================== */
+/* ========== 1) VARIABLES & BASE (DARK) ==================================== */
+:root{
+  /* Palette sombre */
+  --bg:       #0D0E17;
+  --panel:    #1A1B2B;
+  --sidebar:  #141625;
+  --text:     #E7EAF0;
+  --muted:    #A7B0C0;
+  --line:     #2A2C3D;
+  --accent:   #6C9DD8;  /* bleu doux */
+  --accent-2: #FF6D99;  /* rose sakura (H1 / éléments d’accent) */
+  --accent-3: #88BDBC;  /* vert bambou (H3) */
 
-/* Corps global (police, fond, couleur) */
-html, body, [class*="css"] {
-  font-family: 'Noto Sans JP', sans-serif;
-  background-color: #0D0E17;   /* fond sombre principal */
-  color: #E0E0E0;              /* texte par défaut */
-  font-size: 16px;
-  line-height: 1.6;
+  /* Mise en page */
+  --page-max: 1280px;
+  --gutter:   1.25rem;
 }
 
-/* Sidebar avec texture légère */
-section[data-testid="stSidebar"] {
-  background-color: #141625;
+/* Corps global (police + couleurs de base) */
+html, body{
+  font-family: 'Noto Sans JP', system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Sidebar (texture douce, non agressive) */
+section[data-testid="stSidebar"]{
+  background-color: var(--sidebar);
   background-image: url("https://www.transparenttextures.com/patterns/wavecut.png");
   background-size: 180px;
   background-repeat: repeat;
   background-blend-mode: overlay;
 }
 
-/* Titres */
-h1 { font-size: 2rem;  font-weight: 700; color: #FF6D99; }     /* rose sakura */
-h2 { font-size: 1.6rem; font-weight: 600; color: #FF90B1; }    /* plus clair */
-h3 { font-size: 1.3rem; font-weight: 500; color: #88BDBC; }    /* vert bambou */
+/* Titres (fonctions d’accent) */
+h1 { font-size: 2rem;   font-weight: 700; color: var(--accent-2); }
+h2 { font-size: 1.6rem; font-weight: 600; color: color-mix(in srgb, var(--accent-2) 75%, white 25%); }
+h3 { font-size: 1.3rem; font-weight: 600; color: var(--accent-3); }
 
-/* Texte générique (gardé pour la compatibilité, voir patch #5 plus bas) */
-p, span, div { color: #E0E0E0; }
+/* Longueur de ligne lisible pour les textes */
+p, .lead, .card .text { max-width: 72ch; }
 
-/* Inputs / selects */
-input, select, textarea {
+/* ========== 2) LAYOUT RESPONSIVE ========================================== */
+/* Conteneur principal Streamlit (sélecteur stable) */
+[data-testid="stAppViewContainer"] .block-container{
+  width: 100%;
+  max-width: var(--page-max);
+  padding-left: var(--gutter);
+  padding-right: var(--gutter);
+}
+
+/* Plafonds progressifs pour très grands écrans */
+@media (min-width:1600px){ :root{ --page-max: 1440px; } }
+@media (min-width:1900px){ :root{ --page-max: 1600px; } }
+
+/* Wrappers génériques si utilisés */
+.wrapper, .content, .inner{
+  width: 100%;
+  max-width: var(--page-max);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+/* ========== 3) COMPOSANTS (DARK) ========================================== */
+/* Inputs / selects / textareas */
+input, select, textarea,
+.stTextInput input, .stNumberInput input, .stDateInput input,
+.stSelectbox div[role="combobox"] input{
   background-color: #1A1C2B;
-  color: #F0F0F0;
+  color: var(--text);
   border-radius: 8px;
   border: 1px solid #333;
   outline: none;
 }
 
+/* Placeholders lisibles en sombre */
+input::placeholder, textarea::placeholder{
+  color: color-mix(in srgb, var(--text) 60%, transparent);
+}
+
 /* Boutons */
-.stButton > button {
-  background-color: #6C9DD8; /* bleu doux */
+.stButton > button, button{
+  background-color: var(--accent);
   color: #fff;
   border-radius: 8px;
-  padding: 0.5rem 1rem;
+  padding: .5rem 1rem;
   font-size: 14px;
-  transition: background-color .2s ease-in-out;
   border: none;
   cursor: pointer;
+  transition: background-color .2s ease-in-out, transform .05s ease-in-out;
 }
-.stButton > button:hover { background-color: #547BB3; }
+.stButton > button:hover, button:hover{ background-color: #547BB3; }
+.stButton > button:active, button:active{ transform: translateY(1px); }
 
-/* Cartes / blocs de contenu */
-div[data-testid="stVerticalBlock"] {
-  background-color: #1A1B2B;
+/* Cartes / blocs */
+div[data-testid="stVerticalBlock"]{
+  background-color: var(--panel);
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0,0,0,.3);
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 10px; }
-::-webkit-scrollbar-thumb { background-color: #3A3A4D; border-radius: 6px; }
+/* Scrollbar (WebKit) */
+::-webkit-scrollbar{ width: 10px; }
+::-webkit-scrollbar-thumb{ background-color: #3A3A4D; border-radius: 6px; }
 
 /* Onglets */
-.stTabs [role="tablist"] { border-bottom: 2px solid #2A2C3D; }
-.stTabs [role="tab"] {
-  color: #FF6D99;
+.stTabs [role="tablist"]{ border-bottom: 2px solid var(--line); }
+.stTabs [role="tab"]{
+  color: var(--accent-2);
   padding: .5rem 1rem;
   font-weight: 600;
+  opacity: .9;
 }
-.stTabs [aria-selected="true"] {
-  border-bottom: 3px solid #6C9DD8;
-  color: #6C9DD8;
+.stTabs [aria-selected="true"]{
+  border-bottom: 3px solid var(--accent);
+  color: var(--accent);
+  opacity: 1;
 }
 
-/* Expanders */
-details {
+/* Expanders (balise <details>) */
+details{
   background-color: #1F2030;
   border: 1px solid #333;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: .8rem;
 }
 
-/* Messages */
-.stAlert { border-radius: 6px; padding: 1rem; }
-.stAlert[data-baseweb="alert"] { box-shadow: none; }
-.stAlert > div { font-size: .95rem; }
-
-/* Footer Streamlit masqué */
-footer, .css-qri22k { display: none; }
-
-/* ========== 2) LAYOUT RESPONSIVE — LARGEUR MAÎTRISÉE ====================== */
-
-:root{
-  --page-max: 1280px;   /* largeur max confort desktop */
-  --gutter: 1.25rem;    /* marges latérales */
+/* Messages / alertes */
+.stAlert{
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: none;
 }
 
-/* Conteneur principal Streamlit */
-main .block-container{
-  width: 100% !important;
-  max-width: var(--page-max) !important;
-  padding-left: var(--gutter);
-  padding-right: var(--gutter);
-}
+/* Pied Streamlit (sélecteur stable) */
+[data-testid="stFooter"]{ display: none; }
 
-/* Plafonds progressifs sur très grands écrans */
-@media (min-width:1600px){ :root{ --page-max: 1440px; } }
-@media (min-width:1900px){ :root{ --page-max: 1600px; } }
-
-/* Wrappers éventuels (si utilisés) */
-.wrapper, .content, .inner{
-  width: 100%;
-  max-width: var(--page-max);
-  margin-left: auto; margin-right: auto;
-  padding-left: var(--gutter); padding-right: var(--gutter);
-}
-
-/* Longueur de ligne lisible pour les textes */
-p, .lead, .card .text { max-width: 72ch; }
-
-/* ========== 3) MODE CLAIR — OVERRIDES ===================================== */
+/* ========== 4) MODE CLAIR (OVERRIDES) ===================================== */
 /* Active automatiquement si l’OS/navigateur est en “light”. */
 @media (prefers-color-scheme: light){
   :root{
-    --bg:      #f6f7fb;
-    --panel:   #ffffff;
-    --sidebar: #eef1f7;
-    --text:    #0f172a;
-    --muted:   #475569;
-    --line:    #d5d8e2;
-    --accent:  #6C9DD8; /* bleu */
-    --accent2: #FF6D99; /* rose titres */
+    --bg:       #F6F7FB;
+    --panel:    #FFFFFF;
+    --sidebar:  #EEF1F7;
+    --text:     #0F172A;
+    --muted:    #334155; /* légèrement plus contrasté pour la lisibilité */
+    --line:     #D5D8E2;
+    --accent:   #6C9DD8;
+    --accent-2: #FF6D99;
+    --accent-3: #2B6C6B;
   }
 
-  /* Fond + texte généraux */
-  html, body, [class*="css"]{
-    background-color: var(--bg) !important;
-    color: var(--text) !important;
-  }
+  html, body{ background: var(--bg); color: var(--text); }
 
-  /* Sidebar (sans texture sombre) */
   section[data-testid="stSidebar"]{
-    background: var(--sidebar) !important;
-    background-image: none !important;
+    background: var(--sidebar);
+    background-image: none;
   }
 
   /* Titres */
-  h1{ color: var(--accent2) !important; }
-  h2{ color: #e97aa0 !important; }
-  h3{ color: #2b6c6b !important; }
+  h1{ color: var(--accent-2); }
+  h2{ color: color-mix(in srgb, var(--accent-2) 75%, white 25%); }
+  h3{ color: var(--accent-3); }
 
-  /* Texte courant */
-  p, span, div { color: var(--text) !important; }
+  /* Texte courant (renfort) */
+  [data-testid="stAppViewContainer"],
+  [data-testid="stMain"],
+  [data-testid="stMarkdownContainer"]{
+    color: var(--text);
+  }
+  [data-testid="stMarkdownContainer"] p,
+  [data-testid="stMarkdownContainer"] li,
+  [data-testid="stMarkdownContainer"] strong,
+  [data-testid="stMarkdownContainer"] em{
+    color: var(--text);
+  }
 
   /* Inputs */
-  input, select, textarea{
-    background-color: var(--panel) !important;
-    color: var(--text) !important;
-    border-color: var(--line) !important;
-  }
-
-  /* Boutons */
-  .stButton > button{
-    background-color: var(--accent) !important;
-    color: #fff !important;
-    border: none !important;
-  }
-  .stButton > button:hover{ background-color: #3b82c4 !important; }
-
-  /* Cartes / blocs */
-  div[data-testid="stVerticalBlock"]{
-    background-color: var(--panel) !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,.08) !important;
-  }
-
-  /* Tabs */
-  .stTabs [role="tablist"]{ border-bottom: 1px solid var(--line) !important; }
-  .stTabs [role="tab"]{ color: var(--accent2) !important; }
-  .stTabs [aria-selected="true"]{
-    border-bottom: 3px solid var(--accent) !important;
-    color: var(--accent) !important;
-  }
-
-  /* Expanders */
-  details{
-    background-color: var(--panel) !important;
-    border-color: var(--line) !important;
-  }
-
-  /* Scrollbar claire */
-  ::-webkit-scrollbar-thumb{ background-color: #cbd5e1 !important; }
-}
-
-/* ========== 4) PATCH LIGHT — WIDGETS STREAMLIT RÉCALCITRANTS ============== */
-/* Corrige le contraste et les composants qui réappliquent des styles inline. */
-@media (prefers-color-scheme: light){
-
-  /* Texte forcé dans divers conteneurs */
-  [data-testid="stAppViewContainer"],
-  [data-testid="stToolbar"],
-  [data-testid="stMarkdownContainer"],
-  [data-testid="stHeader"],
-  [data-testid="stMain"] * {
-    color: var(--text) !important;
-  }
-
-  /* Légendes / muted */
-  .muted, .caption, small, .stCaption, .st-emotion-cache-1kyxreq{
-    color: var(--muted) !important;
-    opacity: 1 !important;
-  }
-
-  /* Séparateurs & tablist */
-  hr, .stDivider, .stHorizontalBlock, .stTabs [role="tablist"]{
-    border-color: var(--line) !important;
-    color: var(--line) !important;
-  }
-
-  /* Progress bar (rail + jauge) */
-  .stProgress [role="progressbar"] > div{ background-color: var(--accent) !important; }
-  .stProgress > div{ background-color: #e5e7eb !important; }
-
-  /* File uploader (supprime le fond bleuté natif) */
-  .stFileUploader,
-  .stFileUploader > section,
-  .stFileUploader div[data-testid="stFileUploaderDropzone"]{
-    background: var(--panel) !important;
-    border-color: var(--line) !important;
-    color: var(--text) !important;
-  }
-
-  /* Inputs/selects résiduels */
   input, select, textarea,
   .stTextInput input, .stNumberInput input, .stDateInput input,
   .stSelectbox div[role="combobox"] input{
-    background-color: var(--panel) !important;
-    border-color: var(--line) !important;
-    color: var(--text) !important;
+    background-color: var(--panel);
+    color: var(--text);
+    border-color: var(--line);
+  }
+  input::placeholder, textarea::placeholder{
+    color: color-mix(in srgb, var(--text) 60%, transparent);
   }
 
-  /* Boutons / pills désactivés */
-  .stButton > button[disabled],
-  .st-emotion-cache-1r6slb0, .st-emotion-cache-1r6slb0[disabled]{
-    background: #eef2f7 !important;
-    color: var(--muted) !important;
-    border-color: var(--line) !important;
+  /* Boutons */
+  .stButton > button, button{
+    background-color: var(--accent);
+    color: #fff;
   }
+  .stButton > button:hover, button:hover{ background-color: #3b82c4; }
 
-  /* Tabs (actif/inactif homogènes) */
-  .stTabs [role="tab"]{ color: var(--accent2) !important; opacity: 1 !important; }
-  .stTabs [aria-selected="true"]{
-    border-bottom: 3px solid var(--accent) !important;
-    color: var(--accent) !important;
-  }
-
-  /* Cartes/blocs qui “reblanchissent” partiellement */
+  /* Cartes / blocs */
   div[data-testid="stVerticalBlock"]{
-    background: var(--panel) !important;
-    border-color: var(--line) !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,.08) !important;
+    background-color: var(--panel);
+    border-color: var(--line);
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+
+  /* Tabs */
+  .stTabs [role="tablist"]{ border-bottom: 1px solid var(--line); }
+  .stTabs [role="tab"]{ color: var(--accent-2); }
+  .stTabs [aria-selected="true"]{
+    border-bottom: 3px solid var(--accent);
+    color: var(--accent);
+  }
+
+  /* Légendes / muted */
+  .muted, .caption, small, .stCaption{
+    color: var(--muted);
+    opacity: 1;
+  }
+
+  /* Séparateurs */
+  hr, .stDivider{ border-color: var(--line); color: var(--line); }
+
+  /* Progress bar */
+  .stProgress [role="progressbar"] > div{ background-color: var(--accent); }
+  .stProgress > div{ background-color: #e5e7eb; }
+
+  /* File uploader */
+  .stFileUploader,
+  .stFileUploader > section,
+  .stFileUploader div[data-testid="stFileUploaderDropzone"]{
+    background: var(--panel);
+    border-color: var(--line);
+    color: var(--text);
   }
 
   /* Liens */
-  a, a:visited{ color: #0b66c3 !important; }
-  a:hover{ color: #074a91 !important; }
+  a, a:visited{ color: #0b66c3; }
+  a:hover{ color: #074a91; }
 }
 
-/* ========== 5) PATCHES DE ROBUSTESSE (TOUS MODES) ======================== */
+/* ========== 5) PATCHES DE ROBUSTESSE ====================================== */
+/* Héritage cohérent du texte : évite le “gris clair sur blanc” en clair */
+[data-testid="stAppViewContainer"] *{ color: inherit; }
 
-/* Scope typographique : évite de recoloriser des sous-composants internes */
-[data-testid="stAppViewContainer"] p,
-[data-testid="stAppViewContainer"] span,
-[data-testid="stAppViewContainer"] div{
-  color: inherit; /* hérite de html/body ou des overrides light */
-}
+/* Fond du conteneur racine (au cas où Streamlit surécrit html/body) */
+[data-testid="stAppViewContainer"]{ background: inherit; }
 
-/* Fond du conteneur racine (prime sur html/body si Streamlit l’écrase) */
-[data-testid="stAppViewContainer"]{ background: inherit !important; }
-
-/* Focus visible (a11y) pour inputs/selects/boutons */
-:where(input, select, textarea, button, [role="combobox"]) :focus,
+/* Focus visible (A11Y) — correction du sélecteur : pas d’espace avant :focus */
 :where(input, select, textarea, button, [role="combobox"]):focus{
-  outline: 2px solid #94a3b8 !important; /* gris-bleu lisible sur clair/sombre */
-  outline-offset: 2px !important;
-  box-shadow: none !important;
+  outline: 2px solid #94a3b8;
+  outline-offset: 2px;
+  box-shadow: none;
 }
 
 /* Images responsives (bannières, logos) */
 img{ max-width: 100%; height: auto; }
 
-/* Header Streamlit transparent (évite un bandeau opaque) */
-[data-testid="stHeader"]{ background: transparent !important; }
-
-/* ============================================================
-   PATCH LIGHT — texte trop pâle (renfort de spécificité)
-   À coller TOUT EN BAS du fichier.
-   ============================================================ */
-@media (prefers-color-scheme: light){
-
-  /* 0) Contraste "muted" un peu plus foncé pour la lisibilité */
-  :root{ --muted: #334155; } /* ancien #475569 */
-
-  /* 1) Forcer la couleur du TEXTE dans toute la zone app (sauf boutons/SVG) */
-  [data-testid="stAppViewContainer"] *,
-  [data-testid="stMain"] * {
-    color: var(--text) !important;
-  }
-  /* Exceptions : boutons, icônes SVG, jauges… (on les stylise plus bas) */
-  .stButton > button,
-  button,
-  svg, svg *, [role="img"] *,
-  .stProgress [role="progressbar"] > div {
-    color: initial !important;
-  }
-
-  /* 2) Markdown & sous-classes utilisées par Streamlit */
-  [data-testid="stMarkdownContainer"] p,
-  [data-testid="stMarkdownContainer"] li,
-  [data-testid="stMarkdownContainer"] em,
-  [data-testid="stMarkdownContainer"] strong,
-  .markdown-text-container p,
-  .markdown-text-container li {
-    color: var(--text) !important;
-    opacity: 1 !important;
-  }
-
-  /* 3) Légendes / textes atténués (ré-applique la couleur muted) */
-  .muted, .caption, small, .stCaption,
-  .st-emotion-cache-1kyxreq,
-  [data-testid="stMarkdownContainer"] .small,
-  [data-testid="stMarkdownContainer"] .caption {
-    color: var(--muted) !important;
-    opacity: 1 !important;
-  }
-
-  /* 4) Inputs et placeholders (souvent trop gris) */
-  input::placeholder, textarea::placeholder {
-    color: color-mix(in srgb, var(--text) 60%, transparent) !important;
-    opacity: 1 !important;
-  }
-
-  /* 5) Boutons : remettre un texte blanc et lisible */
-  .stButton > button, button {
-    color: #fff !important;
-  }
-
-  /* 6) Alertes / messages d’info (éviter gris sur jaune) */
-  .stAlert, .stAlert * {
-    color: #1f2937 !important; /* gris foncé lisible */
-  }
-
-  /* 7) File uploader (texte et petites légendes) */
-  .stFileUploader * {
-    color: var(--text) !important;
-  }
-}
+/* Header Streamlit transparent */
+[data-testid="stHeader"]{ background: transparent; }
