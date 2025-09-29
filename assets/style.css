@@ -303,3 +303,67 @@ img{ max-width: 100%; height: auto; }
 
 /* Header Streamlit transparent (évite un bandeau opaque) */
 [data-testid="stHeader"]{ background: transparent !important; }
+
+/* ============================================================
+   PATCH LIGHT — texte trop pâle (renfort de spécificité)
+   À coller TOUT EN BAS du fichier.
+   ============================================================ */
+@media (prefers-color-scheme: light){
+
+  /* 0) Contraste "muted" un peu plus foncé pour la lisibilité */
+  :root{ --muted: #334155; } /* ancien #475569 */
+
+  /* 1) Forcer la couleur du TEXTE dans toute la zone app (sauf boutons/SVG) */
+  [data-testid="stAppViewContainer"] *,
+  [data-testid="stMain"] * {
+    color: var(--text) !important;
+  }
+  /* Exceptions : boutons, icônes SVG, jauges… (on les stylise plus bas) */
+  .stButton > button,
+  button,
+  svg, svg *, [role="img"] *,
+  .stProgress [role="progressbar"] > div {
+    color: initial !important;
+  }
+
+  /* 2) Markdown & sous-classes utilisées par Streamlit */
+  [data-testid="stMarkdownContainer"] p,
+  [data-testid="stMarkdownContainer"] li,
+  [data-testid="stMarkdownContainer"] em,
+  [data-testid="stMarkdownContainer"] strong,
+  .markdown-text-container p,
+  .markdown-text-container li {
+    color: var(--text) !important;
+    opacity: 1 !important;
+  }
+
+  /* 3) Légendes / textes atténués (ré-applique la couleur muted) */
+  .muted, .caption, small, .stCaption,
+  .st-emotion-cache-1kyxreq,
+  [data-testid="stMarkdownContainer"] .small,
+  [data-testid="stMarkdownContainer"] .caption {
+    color: var(--muted) !important;
+    opacity: 1 !important;
+  }
+
+  /* 4) Inputs et placeholders (souvent trop gris) */
+  input::placeholder, textarea::placeholder {
+    color: color-mix(in srgb, var(--text) 60%, transparent) !important;
+    opacity: 1 !important;
+  }
+
+  /* 5) Boutons : remettre un texte blanc et lisible */
+  .stButton > button, button {
+    color: #fff !important;
+  }
+
+  /* 6) Alertes / messages d’info (éviter gris sur jaune) */
+  .stAlert, .stAlert * {
+    color: #1f2937 !important; /* gris foncé lisible */
+  }
+
+  /* 7) File uploader (texte et petites légendes) */
+  .stFileUploader * {
+    color: var(--text) !important;
+  }
+}
