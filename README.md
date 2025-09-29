@@ -1,6 +1,6 @@
 # 🌸 Datalyzer – Analyse exploratoire et nettoyage intelligent de données
 
-**Datalyzer** est une application interactive construite avec **Streamlit** qui transforme vos données tabulaires (CSV, Excel, Parquet) en une expérience d’exploration fluide, pédagogique et esthétique.
+Datalyzer est une application interactive construite avec Streamlit qui transforme vos données tabulaires (CSV, Excel, Parquet) en une expérience d’exploration fluide, pédagogique et esthétique.
 Elle guide chaque étape de l’**analyse exploratoire des données (EDA)** : import, exploration, nettoyage, typage, détection d’anomalies, évaluation de la qualité, analyses multivariées et export final.
 
 Conçue pour les **data analysts, data scientists et ingénieurs data**, Datalyzer associe :
