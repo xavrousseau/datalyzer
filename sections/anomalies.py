@@ -16,7 +16,7 @@ from utils.snapshot_utils import save_snapshot
 from utils.log_utils import log_action
 from utils.filters import get_active_dataframe 
 from utils.ui_utils import section_header, show_footer
-
+from utils.sql_bridge import expose_to_sql_lab
 
 # ------------------------------- Helpers numériques -------------------------------
 
@@ -197,9 +197,15 @@ def run_anomalies() -> None:
     col1, col2 = st.columns(2)
     with col1:
         if n_anom > 0 and st.button("💾 Snapshot des anomalies"):
-            save_snapshot(df.loc[mask], suffix=f"anomalies_{method}_{col}")
+            # anomalies_df est déjà défini plus haut si n_anom > 0
+            snap_name = f"anomalies_{method}_{col}"
+            save_snapshot(anomalies_df, suffix=snap_name)
             log_action("anomalies_snapshot", f"{n_anom} anomalies sur {col} via {method}")
-            st.success("✅ Snapshot enregistré.")
+
+            # ➜ publier au SQL Lab sous un nom parlant (même logique que le snapshot)
+            expose_to_sql_lab(snap_name, anomalies_df)
+
+            st.success(f"✅ Snapshot enregistré et exposé au SQL Lab sous la table `{snap_name}`.")
     with col2:
         if st.button("📝 Journaliser l’analyse"):
             log_action("anomalies_run", f"col={col}, method={method}, param={thr}, n={n_anom}")

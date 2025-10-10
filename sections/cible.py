@@ -17,7 +17,7 @@ import numpy as np
 from utils.filters import get_active_dataframe 
 from utils.ui_utils import section_header, show_footer
 from utils.eda_utils import compute_correlation_matrix
-
+from utils.sql_bridge import expose_to_sql_lab
 
 # ---------------------------- Helpers ----------------------------
 
@@ -203,29 +203,41 @@ def run_cible() -> None:
                     fig2.update_xaxes(categoryorder="array", categoryarray=order2)
                     st.plotly_chart(fig2, use_container_width=True)
 
-        # Export des agrégats (en mémoire)
-        st.markdown("#### 📤 Export")
-        if st.button("Exporter l’agrégat (CSV)"):
+        # Export / Publication des agrégats
+        st.markdown("#### 📤 Export / Publication")
+        if cat_cols and group_col:
+            cols_to_agg = [target_1] + ([target_2] if target_2 else [])
             try:
-                if cat_cols and group_col:
-                    cols_to_agg = [target_1] + ([target_2] if target_2 else [])
-                    out = (
-                        dfw.groupby(group_col, dropna=False)[cols_to_agg]
-                           .agg(agg_func)
-                           .reset_index()
-                    )
+                out = (
+                    dfw.groupby(group_col, dropna=False)[cols_to_agg]
+                    .agg(agg_func)
+                    .reset_index()
+                )
+            except Exception as e:
+                out = None
+                st.error(f"❌ Erreur lors du calcul de l'agrégat : {e}")
+
+            col_export, col_sql = st.columns(2)
+            with col_export:
+                if out is not None and st.button("📥 Télécharger le CSV"):
                     csv_bytes = out.to_csv(index=False).encode("utf-8-sig")  # BOM pour Excel
                     st.download_button(
-                        label="📥 Télécharger le CSV",
+                        label="⬇️ Export CSV (agrégat)",
                         data=csv_bytes,
                         file_name=f"{'_and_'.join(cols_to_agg)}_by_{group_col}_{agg_func}.csv",
                         mime="text/csv",
                     )
                     st.success("✅ Export prêt au téléchargement.")
-                else:
-                    st.info("Rien à exporter : choisissez une variable de regroupement.")
-            except Exception as e:
-                st.error(f"❌ Erreur lors de l’export : {e}")
+
+            with col_sql:
+                if out is not None and st.button("🧩 Publier l’agrégat au SQL Lab"):
+                    # Nom explicite : <fichier>__agg_<agg>_<cibles>_by_<groupe>
+                    targets_tag = "_and_".join(cols_to_agg)
+                    table_sql = expose_to_sql_lab(f"{nom}__agg_{agg_func}_{targets_tag}_by_{group_col}", out)
+                    st.success(f"✅ Table SQL exposée : `{table_sql}`.")
+
+        else:
+            st.info("Rien à exporter/publier : choisissez une variable de regroupement.")
 
     # ========================================================
     # Onglet 3 — Boxplots Num ↔ Cat

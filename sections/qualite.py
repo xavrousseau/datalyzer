@@ -22,6 +22,7 @@ from utils.snapshot_utils import save_snapshot
 from utils.log_utils import log_action
 from utils.filters import get_active_dataframe 
 from utils.ui_utils import section_header, show_footer
+from utils.sql_bridge import expose_to_sql_lab
 
 
 # =============================== Helpers internes ==============================
@@ -194,7 +195,7 @@ def run_qualite() -> None:
     else:
         st.info("Rien à signaler selon ces règles simples.")
     st.divider()
-
+ 
     # ---------- Correction automatique (semi-auto, confirmée) ----------
     st.markdown("### 🧼 Correction automatique des colonnes problématiques")
     if st.button("Corriger maintenant", key="qual_fix"):
@@ -209,14 +210,19 @@ def run_qualite() -> None:
                     # Modif in-place + mise à jour du state
                     df.drop(columns=to_drop, inplace=True, errors="ignore")
                     st.session_state["df"] = df
+
+                    # Snapshot + log
                     save_snapshot(df, suffix="qualite_cleaned")
                     log_action("qualite_auto_fix", f"{len(to_drop)} colonnes supprimées")
-                    st.success(f"✅ Correction appliquée : {len(to_drop)} colonnes supprimées.")
+
+                    # 👉 Exposer au SQL Lab sous un nom explicite basé sur le fichier actif
+                    expose_to_sql_lab(f"{nom}__qualite_cleaned", df, make_active=True)
+
+                    st.success(f"✅ Correction appliquée : {len(to_drop)} colonnes supprimées. "
+                            f"Table SQL disponible : `{nom}__qualite_cleaned`.")
         except Exception as e:
             st.error(f"❌ Erreur pendant la correction : {e}")
-    st.divider()
-
-
+ 
     # ---------- Footer ----------
     show_footer(
         author="Xavier Rousseau",

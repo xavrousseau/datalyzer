@@ -25,6 +25,7 @@ from utils.eda_utils import (
 from utils.log_utils import log_action
 from utils.filters import validate_step_button, get_active_dataframe
 from utils.ui_utils import section_header, show_eda_progress, show_footer
+from utils.sql_bridge import expose_to_sql_lab
 
 
 def run_exploration() -> None:
@@ -107,23 +108,24 @@ def run_exploration() -> None:
     with tabs[1]:
         st.subheader("🩹 Analyse des valeurs manquantes")
 
-        # Slider exprimé en proportion (0.1 → 10%) pour éviter les confusions
-        threshold = st.slider(
+        # Slider en pourcentage entier (0 → 100 %), puis conversion en proportion [0,1]
+        seuil_pct = st.slider(
             "🎯 Seuil de suppression (%)",
-            min_value=0.1, max_value=1.0, value=0.5,
-            help="Colonnes avec un pourcentage de valeurs manquantes supérieur à ce seuil seront candidates à la suppression."
+            min_value=0, max_value=100, value=50, step=1,
+            help="Colonnes dont le pourcentage de valeurs manquantes est supérieur à ce seuil seront candidates à la suppression."
         )
+        threshold = seuil_pct / 100.0  # ← proportion pour le calcul
 
-        # Heatmap/bar manquants (utils.eda_utils.plot_missing_values renvoie une figure Plotly)
+        # Heatmap/bar manquants
         fig = plot_missing_values(df)
         if fig:
             st.plotly_chart(fig, use_container_width=True)
 
-        # Colonnes dépassant le seuil
+        # Colonnes dépassant le seuil (en proportion)
         cols_na = get_columns_above_threshold(df, threshold)
 
         if cols_na:
-            st.warning(f"{len(cols_na)} colonnes dépassent {threshold*100:.0f}% de NA.")
+            st.warning(f"{len(cols_na)} colonnes dépassent {seuil_pct:.0f}% de NA.")
             selected = st.multiselect(
                 "Colonnes à supprimer",
                 options=cols_na,
@@ -135,14 +137,13 @@ def run_exploration() -> None:
                 df.drop(columns=selected, inplace=True, errors="ignore")
                 st.session_state["df"] = df
                 save_snapshot(df, "missing_dropped")
-                log_action("missing_cleanup", f"{len(selected)} colonnes supprimées (> {threshold*100:.0f}% NA)")
+                expose_to_sql_lab(f"{nom}__missing_dropped", df, make_active=True)
+                log_action("missing_cleanup", f"{len(selected)} colonnes supprimées (> {seuil_pct:.0f}% NA)")
                 st.success("✅ Colonnes supprimées avec succès.")
         else:
             st.info("✅ Aucune colonne ne dépasse le seuil défini.")
 
         validate_step_button("missing", context_prefix="exploration_")
-
-
     # ---------------------------------------------------------
     # 📈 Statistiques descriptives
     # ---------------------------------------------------------
@@ -211,14 +212,17 @@ def run_exploration() -> None:
             )
             col = st.selectbox("🔍 Variable à analyser", num_cols, key="outliers_col")
 
-            # `detect_outliers` renvoie un DataFrame filtré des lignes outliers sur la colonne cible
-            outliers = detect_outliers(df[[col]], method=method)
+            # On récupère ses index pour ré-extraire TOUTES les colonnes depuis le DF d'origine.
+            out_idx = detect_outliers(df[[col]], method=method).index
+            outliers = df.loc[out_idx].copy()
+
             st.info(f"{len(outliers)} outliers détectés sur `{col}` (méthode {method}).")
             st.dataframe(outliers.head(10), use_container_width=True)
 
             if st.button("💾 Sauvegarder les outliers détectés"):
-                save_snapshot(outliers, suffix=f"outliers_{method}")
+                save_snapshot(outliers, suffix=f"outliers_{method}_{col}")
                 log_action("outliers_detected", f"{len(outliers)} sur {col} ({method})")
+                expose_to_sql_lab(f"{nom}__outliers_{method}_{col}", outliers)
                 st.success("✅ Snapshot des outliers enregistré.")
 
         validate_step_button("extremes", context_prefix="exploration_")
@@ -285,6 +289,7 @@ def run_exploration() -> None:
                 df.drop(columns=all_to_drop, inplace=True, errors="ignore")
                 st.session_state["df"] = df
                 save_snapshot(df, suffix="auto_cleaned")
+                expose_to_sql_lab(f"{nom}__auto_cleaned", df, make_active=True)
                 log_action("auto_cleanup", f"{len(all_to_drop)} colonnes supprimées (const/faible var/NA élevés)")
                 st.success("✅ Nettoyage appliqué.")
         else:

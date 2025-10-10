@@ -31,6 +31,7 @@ from pandas.api.types import (
 from utils.filters import get_active_dataframe
 from utils.eda_utils import compute_cramers_v_matrix, plot_boxplots
 from utils.ui_utils import section_header, show_footer
+from utils.sql_bridge import expose_to_sql_lab
 
 
 # =============================================================================
@@ -198,6 +199,20 @@ def run_analyse_categorielle() -> None:
                 except Exception as e:
                     st.warning(f"Heatmap indisponible : {e}")
 
+        # === Export/SQL — Matrice de Cramér’s V ===
+        with st.expander("🧩 Export/SQL — Matrice de Cramér’s V", expanded=False):
+            # Si on a un filtrage "filtered" non vide, on publie le filtré, sinon la matrice complète
+            mat = cramers_df.copy()
+            if not show_full and "filtered" in locals() and isinstance(filtered, pd.DataFrame) and not filtered.empty:
+                mat = filtered.fillna(0)
+
+            mat_sql = mat.copy()
+            mat_sql.insert(0, "__var__", mat_sql.index)  # index en colonne pour les jointures SQL
+
+            if st.button("Publier la matrice au SQL Lab", key="sql_cramers"):
+                table_sql = expose_to_sql_lab(f"{nom}__cramers_v", mat_sql)
+                st.success(f"✅ Table SQL exposée : `{table_sql}`.")
+
     # ==================================================================
     # Onglet 2 — Croisement avec une variable cible
     # ==================================================================
@@ -247,6 +262,20 @@ def run_analyse_categorielle() -> None:
             else:
                 st.plotly_chart(fig, use_container_width=True)
 
+            with st.expander("🧩 Export/SQL — Agrégats par groupe", expanded=False):
+                try:
+                    agg_df = (
+                        df.groupby(explicative, dropna=False)[target_1 if 'target_1' in locals() else cible]
+                        .agg(['count', 'mean', 'median', 'std'])
+                        .reset_index()
+                    )
+                    st.dataframe(agg_df.head(10), use_container_width=True)
+                    if st.button("Publier l’agrégat au SQL Lab", key="sql_target_num"):
+                        table_sql = expose_to_sql_lab(f"{nom}__agg_{cible}_by_{explicative}", agg_df)
+                        st.success(f"✅ Table SQL exposée : `{table_sql}`.")
+                except Exception as e:
+                    st.warning(f"Agrégat indisponible : {e}")
+
         # ---- Cas 2.b) Cible catégorielle-like → crosstab % + barres empilées ----
         elif cible_is_cat:
             st.markdown("#### 📊 Répartition croisée normalisée (par ligne)")
@@ -284,12 +313,27 @@ def run_analyse_categorielle() -> None:
 
             st.plotly_chart(fig_stack, use_container_width=True)
 
+            # === Export/SQL — Crosstab normalisé ===
+            with st.expander("🧩 Export/SQL — Crosstab normalisé", expanded=False):
+                cross_sql = cross.reset_index()  # index → colonne pour jointures SQL
+                st.dataframe(cross_sql.head(10), use_container_width=True)
+                if st.button("Publier le crosstab au SQL Lab", key="sql_crosstab"):
+                    table_sql = expose_to_sql_lab(f"{nom}__crosstab_{explicative}_x_{cible}", cross_sql)
+                    st.success(f"✅ Table SQL exposée : `{table_sql}`.")
+
         # ---- Cas 2.c) Cible non exploitable ----
         else:
             st.warning(
                 "❌ La variable cible sélectionnée n’est pas exploitable ici "
                 "(ni numérique, ni catégorielle-like : category/object/string/bool)."
             )
+
+        with st.expander("🧩 Export/SQL — Crosstab normalisé", expanded=False):
+            cross_sql = cross.reset_index()  # index → colonne pour jointures SQL
+            st.dataframe(cross_sql.head(10), use_container_width=True)
+            if st.button("Publier le crosstab au SQL Lab", key="sql_crosstab"):
+                table_sql = expose_to_sql_lab(f"{nom}__crosstab_{explicative}_x_{cible}", cross_sql)
+                st.success(f"✅ Table SQL exposée : `{table_sql}`.")
 
     # ---------- Footer ----------
     show_footer(author="Xavier Rousseau", site_url="https://xavrousseau.github.io/", version="1.0")

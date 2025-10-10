@@ -4,13 +4,14 @@
 #            + Snapshots, aperçu, résumé analytique
 # Design   : API UI unifiée (section_header, show_footer)
 # Auteur   : Xavier Rousseau
+# Note     : Intègre la synchronisation pour le "SQL Lab"
 # ============================================================
 
 from __future__ import annotations
 
 import os
 import re
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 import pandas as pd
 import streamlit as st
@@ -20,6 +21,7 @@ from utils.snapshot_utils import (
 )
 from utils.log_utils import log_action
 from utils.ui_utils import section_header, show_footer  # <— API UI unifiée
+
 
 # ============================ Constantes & utilitaires =========================
 
@@ -36,9 +38,22 @@ SUPPORTED_EXTS = [".csv", ".txt", ".xlsx", ".xls", ".parquet"]
 PREVIEW_ROWS = 100
 
 
+# --- SQL Lab sync (NOUVEAU) ---------------------------------------------------
+# On crée un "miroir" lisible par la page SQL Lab :
+# - st.session_state["datasets"] : {table_name: dataframe}
+# - alias "data" qui pointe toujours vers le DataFrame actif (KEY_DF)
+SQL_LAB_TABLES = "datasets"      # clé session consultée par la page SQL Lab
+SQL_LAB_HISTORY = "sql_history"  # historique des requêtes (pratique à initialiser ici)
+
+
 def _ensure_state() -> None:
-    """Assure l'initialisation des clés de session nécessaires."""
+    """
+    Assure l'initialisation des clés de session nécessaires.
+    On crée aussi les clés utilisées par le SQL Lab (datasets + sql_history).
+    """
     st.session_state.setdefault(KEY_DFS, {})
+    st.session_state.setdefault(SQL_LAB_TABLES, {})
+    st.session_state.setdefault(SQL_LAB_HISTORY, [])
 
 
 def _sanitize_key(s: str) -> str:
@@ -48,6 +63,28 @@ def _sanitize_key(s: str) -> str:
     """
     s = s.strip().lower()
     return re.sub(r"[^\w\-\.]+", "_", s)
+
+
+def _refresh_sql_datasets() -> None:
+    """
+    Reflète KEY_DFS / KEY_DF dans st.session_state["datasets"] pour le SQL Lab.
+    - Crée une table par fichier importé (nom nettoyé, sans extension).
+    - Ajoute aussi un alias 'data' pointant sur le DataFrame actif (pratique).
+    Cette fonction est appelée après tout changement sur KEY_DFS / KEY_DF.
+    """
+    ss = st.session_state
+    ss.setdefault(SQL_LAB_TABLES, {})
+    ss[SQL_LAB_TABLES].clear()
+
+    # 1) Toutes les tables provenant des fichiers importés
+    for fname, fdf in ss.get(KEY_DFS, {}).items():
+        base = os.path.splitext(str(fname))[0]         # "ventes.csv" -> "ventes"
+        table = _sanitize_key(base).replace(".", "_")  # nettoyage + pas de points
+        ss[SQL_LAB_TABLES][table] = fdf
+
+    # 2) Alias 'data' vers le DataFrame actif si présent
+    if ss.get(KEY_DF) is not None:
+        ss[SQL_LAB_TABLES]["data"] = ss[KEY_DF]
 
 
 def _read_non_excel_uploaded_file(file) -> pd.DataFrame:
@@ -112,7 +149,9 @@ def _import_excel_with_ui(file, name: str) -> List[Tuple[str, pd.DataFrame]]:
             try:
                 df = pd.read_excel(xls, sheet_name=sheet)
             except Exception as e:
-                raise RuntimeError(f"Erreur de lecture de l’onglet « {sheet} » dans {name} : {e}") from e
+                raise RuntimeError(
+                    f"Erreur de lecture de l’onglet « {sheet} » dans {name} : {e}"
+                ) from e
             return [(sheet, df)]
 
         # Mode multi-sélection
@@ -144,11 +183,13 @@ def _import_excel_with_ui(file, name: str) -> List[Tuple[str, pd.DataFrame]]:
     try:
         df = pd.read_excel(xls, sheet_name=only)
     except Exception as e:
-        raise RuntimeError(f"Erreur de lecture de l’onglet « {only} » dans {name} : {e}") from e
+        raise RuntimeError(
+            f"Erreur de lecture de l’onglet « {only} » dans {name} : {e}"
+        ) from e
     return [(only, df)]
 
 
-def _summarize_dataframe(name: str, df: pd.DataFrame) -> dict[str, object]:
+def _summarize_dataframe(name: str, df: pd.DataFrame) -> Dict[str, object]:
     """
     Résumé synthétique :
       - Lignes, Colonnes
@@ -165,10 +206,12 @@ def _summarize_dataframe(name: str, df: pd.DataFrame) -> dict[str, object]:
 
 def _attach_as_active(df: pd.DataFrame, name: str) -> None:
     """
-    Ajoute le DataFrame dans KEY_DFS et le définit comme actif (KEY_DF).
+    Ajoute le DataFrame dans KEY_DFS et le définit comme actif (KEY_DF),
+    puis synchronise le miroir SQL Lab (datasets + alias data).
     """
     st.session_state[KEY_DFS][name] = df
     st.session_state[KEY_DF] = df
+    _refresh_sql_datasets()  # <<< synchronisation SQL Lab
 
 
 # === Cache léger pour éviter de recharger un snapshot plusieurs fois durant la session ===
@@ -231,8 +274,10 @@ def run_chargement() -> None:
                     f"Nom du snapshot pour {name}",
                     value=default_snap,
                     key=snap_key,
-                    help="Nom lisible pour retrouver cette version (sans l’extension). "
-                         "Pour Excel multi-onglets, l’onglet sera suffixé automatiquement.",
+                    help=(
+                        "Nom lisible pour retrouver cette version (sans l’extension). "
+                        "Pour Excel multi-onglets, l’onglet sera suffixé automatiquement."
+                    ),
                 ) or default_snap
 
                 # --- Excel (multi-onglets géré via UI dédiée) ---
@@ -247,9 +292,12 @@ def run_chargement() -> None:
                     for sheet, df in sheets_with_df:
                         snap_name = f"{snapshot_base}__{sheet}"
                         attach_name = f"{name}__{sheet}"
+
+                        # Sauvegarde snapshot + activation & sync
                         save_snapshot(df, suffix=snap_name)
-                        _attach_as_active(df, attach_name)
+                        _attach_as_active(df, attach_name)  # <<< met aussi à jour SQL Lab
                         log_action("import", f"{name} | sheet={sheet}")
+
                         imported_count += 1
                         st.success(f"✅ {name} / {sheet} chargé ({df.shape[0]} lignes). Snapshot : {snap_name}")
 
@@ -259,10 +307,14 @@ def run_chargement() -> None:
 
                 # --- Autres formats (CSV/TXT/Parquet) ---
                 df = _read_non_excel_uploaded_file(file)
+
+                # Sauvegarde snapshot
                 save_snapshot(df, suffix=snapshot_base)
                 log_action("import", f"{name} chargé")
                 st.success(f"✅ Fichier **{name}** chargé ({df.shape[0]} lignes). Snapshot : {snapshot_base}")
-                _attach_as_active(df, name)
+
+                # Ajout + actif + sync SQL Lab
+                _attach_as_active(df, name)  # <<< met aussi à jour SQL Lab
 
             except RuntimeError as e:
                 st.error(f"❌ {e}")
@@ -290,11 +342,15 @@ def run_chargement() -> None:
             )
             st.session_state[KEY_DF] = st.session_state[KEY_DFS][selected]
 
-            # Aperçu
+            # <<< Synchronisation SQL Lab après changement d'actif
+            _refresh_sql_datasets()
+
+            # Aperçu borné
             with st.expander(f"🔍 Aperçu du fichier : {selected}", expanded=True):
                 df_active = st.session_state[KEY_DF]
                 st.write(f"Dimensions : {df_active.shape[0]} lignes × {df_active.shape[1]} colonnes")
                 st.dataframe(df_active.head(PREVIEW_ROWS), use_container_width=True)
+
         else:
             st.info("Aucun fichier chargé pour l’instant. Déposez des fichiers dans la zone ci-dessus.")
 
@@ -363,6 +419,7 @@ def run_chargement() -> None:
                     # Activation (ajoute dans KEY_DFS et le met actif)
                     if st.button("🔄 Activer ce snapshot", type="primary", key="btn_activate_snapshot"):
                         _attach_as_active(df_snap, name=f"[SNAP] {selected_snap}")
+                        # _attach_as_active() synchronise déjà le SQL Lab, donc _refresh_sql_datasets() est optionnel ici
                         log_action("load_snapshot", selected_snap)
                         st.success(
                             f"✅ Snapshot **{selected_snap}** activé ({df_snap.shape[0]} lignes). "
@@ -375,5 +432,5 @@ def run_chargement() -> None:
     show_footer(
         author="Xavier Rousseau",
         site_url="https://xavrousseau.github.io/",
-        version="1.1",  # bump version car ajout feature multi-onglets Excel
+        version="1.2",  # bump version : ajout de la sync SQL Lab
     )

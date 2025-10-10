@@ -34,46 +34,27 @@ def run_home() -> None:
       - En-tête standard (bannière liée à la section "home", citation,
         titre = APP_NAME, baseline).
       - Un encart "Pour bien démarrer" avec un mini mode d'emploi.
-      - Trois cartes en colonnes présentant les fonctionnalités clés.
-      - Un pied de page avec auteur, site et version.
-
-    Dépendances attendues :
-      - `config.APP_NAME` : nom lisible de l’app.
-      - `config.color(key: str, fallback: str)` : récupère une couleur
-        de palette, avec valeur de secours si la clé n’existe pas.
-      - `utils.ui_utils.section_header(...)` : en-tête visuel unifié.
-      - `utils.ui_utils.ui_card(title: str, html_content: str)` :
-        carte responsive avec contenu HTML.
-      - `utils.ui_utils.show_footer(...)` : pied de page standardisé.
-
-    Accessibilité :
-      - Les encarts informatifs utilisent role="note".
-      - Les listes de fonctionnalités sont de vraies <ul>/<li>.
-
-    Remarque :
-      - On utilise `unsafe_allow_html=True` pour un HTML minimal et
-        maîtrisé (encarts, espacements). Le contenu est statique ici.
+      - Un encart d’introduction au SQL Lab.
+      - Trois cartes présentant les fonctionnalités clés.
+      - Un pied de page cohérent sur tout le site.
     """
     # --- Palette : couleurs de texte et de fond du bloc introductif.
-    #     `color` renvoie la valeur définie dans la config, sinon le fallback.
     text = color("texte", "#e8eaed")
     section_bg = color("fond_section", "#111418")
 
-    # ---------- En-tête standard (bannière + citation + titre + baseline) ----------
-    # `section="home"` fait chercher l’image dans config.SECTION_BANNERS["home"].
+    # ---------- En-tête standard ----------
     section_header(
-      title=APP_NAME,
-      subtitle=(
-          "Une plateforme sobre et efficace pour explorer, nettoyer "
-          "et structurer vos données tabulaires."
-      ),
-      section="home",
-      prequote=PRE_TITLE_QUOTE,
-      emoji="🏯",
-  )
+        title=APP_NAME,
+        subtitle=(
+            "Une plateforme sobre et efficace pour explorer, nettoyer "
+            "et structurer vos données tabulaires."
+        ),
+        section="home",
+        prequote=PRE_TITLE_QUOTE,
+        emoji="🏯",
+    )
 
     # ---------- Bloc “Pour bien démarrer” ----------
-    # Petit encart didactique, neutre et lisible, avec role ARIA.
     st.markdown(
         f"""
         <div role="note"
@@ -93,13 +74,11 @@ def run_home() -> None:
         unsafe_allow_html=True,
     )
 
-    # Séparateur visuel léger
 
+    # ---------- Sous-titre d’intro ----------
     st.subheader("Aperçu de l'application")
 
-
-    # ---------- Trois colonnes ----------
-
+    # ---------- Trois colonnes principales ----------
     col1, col2, col3 = st.columns(3)
 
     # Carte 1 : panorama des fonctionnalités
@@ -130,6 +109,7 @@ def run_home() -> None:
             </ul>
             """,
         )
+
     # Carte 3 : analytique et qualité
     with col3:
         ui_card(
@@ -146,12 +126,43 @@ def run_home() -> None:
             """,
         )
 
-    # Petit espace vertical (plus souple qu’un <br>).
+    # Petit espace vertical
     st.markdown("<div style='height:.75rem;'></div>", unsafe_allow_html=True)
 
+    # ---------- Bloc “À propos du SQL Lab” ----------
+    st.markdown(
+        f"""
+        <div role="note"
+             style="
+                background-color:{section_bg};
+                border-left:4px solid #7aa2f7;
+                border-radius:10px;
+                padding:1rem 1.5rem;
+                margin-bottom:1.5rem;
+                box-shadow:0 1px 6px rgba(0,0,0,0.06);
+                color:{text};
+             ">
+            <strong>À propos du SQL Lab</strong><br/>
+            Le SQL Lab vous permet d’exécuter des <em>requêtes ad hoc</em> (moteur DuckDB intégré)
+            pour vérifier ou croiser vos données rapidement.
+            <ul style="margin:.5rem 0 0 .75rem;">
+                <li><b>Comment y retrouver vos jeux ?</b>
+                    Depuis chaque section (Exploration, Typage, Anomalies, Export…),
+                    cliquez sur <em>Publier au SQL Lab</em> pour y rendre la table disponible.</li>
+                <li><b>Jointures faciles :</b>
+                    une colonne <code>__index__</code> est automatiquement ajoutée pour simplifier les jointures.</li>
+                <li><b>Requêtes autorisées :</b>
+                    uniquement des <code>SELECT</code> et <code>JOIN</code> —
+                    les opérations <code>DROP/UPDATE/DELETE/CREATE</code> sont bloquées.</li>
+                <li><b>Utilisation typique :</b>
+                    contrôles qualité, vérifications ciblées, exploration libre.</li>
+            </ul>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     # ---------- Pied de page ----------
-    # Note : show_footer(...) est centralisé pour garantir la cohérence du site.
-    # Assure-toi que sa signature correspond à cette invocation dans utils.ui_utils.
     show_footer(
         author="Xavier Rousseau",
         site_url="https://xavrousseau.github.io/",

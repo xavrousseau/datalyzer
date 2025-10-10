@@ -15,7 +15,7 @@ from utils.snapshot_utils import save_snapshot
 from utils.log_utils import log_action
 from utils.filters import get_active_dataframe 
 from utils.ui_utils import section_header, show_footer
-
+from utils.sql_bridge import expose_to_sql_lab
 
 
 def run_typage() -> None:
@@ -147,7 +147,9 @@ def run_typage() -> None:
             for c, msg in erreurs:
                 st.error(f"`{c}` → {msg}")
         else:
-            st.success("✅ Typage appliqué avec succès. Snapshot enregistré.")
+            # 👉 expose le DataFrame typé au SQL Lab, sous un nom clair et unique basé sur le fichier actif
+            table_sql = expose_to_sql_lab(f"{nom}__typage", df, make_active=True)
+            st.success(f"✅ Typage appliqué, snapshot enregistré et table SQL exposée : `{table_sql}`.")
 
     st.divider()
 

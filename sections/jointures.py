@@ -24,7 +24,7 @@ import streamlit as st
 from utils.snapshot_utils import save_snapshot
 from utils.log_utils import log_action
 from utils.ui_utils import section_header, show_footer
-
+from utils.sql_bridge import expose_to_sql_lab
 
 # =============================== Constantes ===================================
 
@@ -381,6 +381,10 @@ def run_jointures() -> None:
                 save_snapshot(fusion, suffix=nom_fusion)  # cohérent avec la section fichiers
                 log_action("jointure", f"{type_jointure} entre {fichier_gauche} et {fichier_droit} → {nom_fusion}")
 
+                # 👉 5bis) Exposer au SQL Lab, même nom que le fichier dans dfs
+                expose_to_sql_lab(f"{nom_fusion}.csv", fusion, make_active=True)
+                st.toast(f"Table SQL disponible : `{nom_fusion}`", icon="🧩")
+                
                 # 6) Aperçu & téléchargement
                 with st.expander("🔍 Aperçu du résultat", expanded=True):
                     st.dataframe(fusion.head(PREVIEW_ROWS), use_container_width=True)
@@ -399,7 +403,7 @@ def run_jointures() -> None:
         # Guide l'utilisateur vers la condition d'activation :
         # même nombre de colonnes entre gauche et droite.
         st.info("💡 Sélectionnez un nombre **égal** de clés dans les deux fichiers pour activer la jointure.")
-
+    
     # ---------- Footer ----------
     show_footer(
         author="Xavier Rousseau",

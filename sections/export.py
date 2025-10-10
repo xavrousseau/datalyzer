@@ -21,6 +21,7 @@ from utils.snapshot_utils import save_snapshot
 from utils.log_utils import log_action
 from utils.filters import get_active_dataframe
 from utils.ui_utils import section_header, show_footer  # ← en-tête/pied unifiés
+from utils.sql_bridge import expose_to_sql_lab
 
 # =============================================================================
 # Helpers — petites fonctions utilitaires, pures et testables
@@ -437,6 +438,26 @@ def run_export() -> None:
         st.dataframe(df_rows_clean[selected_columns].head(50), use_container_width=True)
     st.caption(f"Résultat courant : **{len(df_rows_clean)}** lignes × **{len(selected_columns)}** colonnes")
 
+
+    # ---------- 6bis) Publication au SQL Lab (sélection courante) ----------
+    with st.expander("🧩 Export/SQL — Exposer la sélection au SQL Lab", expanded=False):
+        # on part de la vue réellement exportée : mêmes lignes + colonnes
+        df_sql = df_rows_clean[selected_columns].copy()
+
+        # Astuce join SQL : garder l'index en colonne explicite
+        df_sql.insert(0, "__index__", df_sql.index)
+
+        default_table = re.sub(r"\W+", "_", f"{os.path.splitext(str(nom))[0]}__export_view").strip("_") or "export_view"
+        table_name = st.text_input("Nom de la table SQL", value=default_table, key="sql_export_name")
+
+        if st.button("Publier au SQL Lab", key="sql_export_publish"):
+            try:
+                sql_table = expose_to_sql_lab(table_name, df_sql, make_active=True)
+                st.success(f"✅ Table SQL exposée : `{sql_table}` (sélection courante).")
+            except Exception as e:
+                st.error(f"❌ Publication SQL impossible : {e}")
+
+
     # ---------- 7) Options de base d'export ----------
     include_index = st.checkbox("Inclure l’index dans le fichier exporté", value=False)
 
@@ -534,6 +555,24 @@ def run_export() -> None:
                 payload = f.read()
 
             st.success(f"✅ Fichier exporté : **{file_name}**")
+            
+            # ---------- 9bis) (Optionnel) Publier aussi la version exportée ----------
+            with st.expander("🧩 Export/SQL — Exposer aussi la version exportée", expanded=False):
+                df_sql_final = df_export.copy()
+                df_sql_final.insert(0, "__index__", df_sql_final.index)
+
+                default_final = re.sub(r"\W+", "_", f"{os.path.splitext(file_name)[0]}").strip("_") or "export_final"
+                table_final = st.text_input("Nom de la table SQL (version export)", value=default_final, key="sql_export_final_name")
+
+                if st.button("Publier la version exportée au SQL Lab", key="sql_export_publish_final"):
+                    try:
+                        sql_table_final = expose_to_sql_lab(table_final, df_sql_final, make_active=False)
+                        st.success(f"✅ Table SQL exposée : `{sql_table_final}`.")
+                    except Exception as e:
+                        st.error(f"❌ Publication SQL impossible : {e}")
+
+
+
             st.download_button(
                 label="📥 Télécharger maintenant",
                 data=payload,

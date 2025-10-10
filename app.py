@@ -24,7 +24,7 @@ from sections.multivariee import run_multivariee
 from sections.cat_analysis import run_analyse_categorielle
 from sections.cible import run_cible
 from sections.suggestions import run_suggestions
-
+from sections.sql_lab import render as run_sql_lab
 
 # ============================================================
 # 1) CONFIGURATION GLOBALE
@@ -53,9 +53,10 @@ routes = {
     "Chargement": run_chargement,
     "Jointures": run_jointures,
     "Export": run_export,
-    "Exploration": run_exploration,
-    "Typage": run_typage,
     "Qualité": run_qualite,
+    "Exploration": run_exploration,
+    "SQL Lab": run_sql_lab, 
+    "Typage": run_typage,
     "Anomalies": run_anomalies,
     "Analyse multivariée": run_multivariee,
     "Analyse catégorielle": run_analyse_categorielle,

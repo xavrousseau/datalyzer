@@ -16,6 +16,7 @@ from utils.snapshot_utils import save_snapshot
 from utils.log_utils import log_action
 from utils.filters import get_active_dataframe 
 from utils.ui_utils import section_header, show_footer
+from utils.sql_bridge import expose_to_sql_lab
 
 
 # =============================== Helpers ======================================
@@ -183,6 +184,7 @@ def run_suggestions() -> None:
                 st.session_state["df"] = df
                 save_snapshot(df, suffix="suggestions_cleaned")
                 log_action("suggestions_cleanup", f"{len(to_drop)} colonnes supprimées (texte libre)")
+                expose_to_sql_lab(f"{nom}__suggestions_cleaned", df, make_active=True)
                 st.success("✅ Colonnes supprimées. Snapshot sauvegardé.")
             except Exception as e:
                 st.error(f"❌ Erreur pendant la suppression : {e}")
