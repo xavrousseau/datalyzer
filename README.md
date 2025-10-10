@@ -30,7 +30,7 @@ Conçue pour les **data analysts, data scientists et ingénieurs data**, Datalyz
 
 ---
 
-##Aperçus
+## Aperçus
 
 * Accueil
   ![Import](docs/screenshot_home.png)
