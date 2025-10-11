@@ -1,32 +1,81 @@
-# 🌸 Datalyzer – Analyse exploratoire et nettoyage intelligent de données
+Parfait — voici un **README mis à jour** avec l’intégration **SQL Lab (DuckDB en mémoire)**, prêt à remplacer ton fichier actuel.
 
-Datalyzer est une application interactive construite avec Streamlit qui transforme vos données tabulaires (CSV, Excel, Parquet) en une expérience d’exploration fluide, pédagogique et esthétique.
-Elle guide chaque étape de l’**analyse exploratoire des données (EDA)** : import, exploration, nettoyage, typage, détection d’anomalies, évaluation de la qualité, analyses multivariées et export final.
+---
+
+# 🌸 Datalyzer – Analyse exploratoire, nettoyage… et SQL Lab (DuckDB)
+
+Datalyzer est une application interactive Streamlit qui transforme vos données tabulaires (CSV, Excel, Parquet) en une expérience d’exploration fluide, pédagogique et esthétique.
+Elle guide chaque étape de l’**analyse exploratoire des données (EDA)** : import, exploration, nettoyage, typage, détection d’anomalies, évaluation de la qualité, analyses multivariées, **exposition SQL** et export final.
 
 Conçue pour les **data analysts, data scientists et ingénieurs data**, Datalyzer associe :
 
 * une **interface intuitive** pour explorer sans coder,
 * des **outils robustes** pour fiabiliser les jeux de données,
-* des **visualisations interactives** pour comprendre rapidement vos variables et leurs relations.
+* des **visualisations interactives** pour comprendre rapidement vos variables et leurs relations,
+* un **SQL Lab** (DuckDB en mémoire) pour requêter directement les résultats intermédiaires.
 
-👉 **Essayez-la en ligne dès maintenant** : [https://datalyzer.streamlit.app/](https://datalyzer.streamlit.app/)
+👉 **Essayer en ligne** : [https://datalyzer.streamlit.app/](https://datalyzer.streamlit.app/)
 
 ---
 
 ## Fonctionnalités principales
 
 * ✅ **Import intelligent** : CSV, TXT, Excel, Parquet (séparateur auto pour CSV/TXT)
-* 🧬 **Typage automatique et manuel** : détection de types + correction interactive (int, float, bool, date, cat, texte)
-* 🔍 **Exploration guidée** : stats descriptives, valeurs manquantes, distributions, outliers, corrélations
-* 🧹 **Nettoyage rapide** : suppression NA, colonnes constantes, faible variance, normalisation
-* 🧪 **Qualité des données** : score global sur 100 + drapeaux (NA, doublons, placeholders, constantes)
-* 🚨 **Détection d’anomalies** : méthodes robustes (Z-score, IQR, MAD)
-* 🎯 **Analyse catégorielle** : matrice de Cramér’s V, crosstabs normalisés, barres empilées, boxplots
-* 📊 **Analyse cible** : relations entre une variable cible numérique et le reste du dataset (corrélations, boxplots par catégorie)
-* 📈 **Multivariée** : ACP (PCA), clustering K-means, variance expliquée, projections 2D
-* 🔗 **Jointures intelligentes** : suggestions de clés, alignement automatique des types, indicateurs de couverture
-* 💾 **Export avancé** : sélection colonnes + filtres de lignes (ET/OU, top-N, échantillon, dédup, suppression NA)
-* 🕰️ **Snapshots** : sauvegardez l’état intermédiaire de vos données, restaurez ou supprimez-les facilement
+* 🧬 **Typage automatique et manuel** : détection + correction (int, float, bool, date, cat, texte)
+* 🔍 **Exploration guidée** : stats, manquants, distributions, outliers, corrélations
+* 🧹 **Nettoyage rapide** : suppression NA, colonnes constantes, faible variance
+* 🧪 **Qualité des données** : score sur 100 + drapeaux (NA, doublons, placeholders)
+* 🚨 **Anomalies** : méthodes robustes (Z-score, IQR, MAD)
+* 🎯 **Analyse catégorielle** : Cramér’s V, crosstabs normalisés, barres empilées, boxplots
+* 📊 **Analyse cible** : corrélations cible num., groupements par catégorie
+* 📈 **Multivariée** : ACP (PCA), K-means, variance expliquée, projections 2D/3D
+* 🔗 **Jointures intelligentes** : suggestions de clés, alignement des types, couverture
+* 💾 **Export avancé** : colonnes + filtres de lignes (ET/OU, top-N, échantillon, dédup, NA)
+* 🕰️ **Snapshots** : sauvegarde d’états intermédiaires
+* 🧩 **SQL Lab (DuckDB)** : exécute des **SELECT** sur les tables exposées depuis n’importe quelle section
+
+---
+
+## SQL Lab (DuckDB) — c’est quoi ?
+
+Un **moteur SQL en mémoire** pour requêter instantanément les sorties des différentes sections (typage, anomalies, PCA, agrégats…).
+Techniquement :
+
+* **DuckDB** tourne en mémoire et gère des vues/tab. à partir de `pandas`, `polars` ou `pyarrow`.
+
+* Un petit pont `utils/sql_bridge.py` te permet d’**exposer** n’importe quel DataFrame au SQL Lab via :
+
+  ```python
+  from utils.sql_bridge import expose_to_sql_lab
+
+  expose_to_sql_lab("nom_table", df, make_active=True)
+  ```
+
+  * `nom_table` est nettoyé (`-` et espaces → `_`).
+  * `make_active=True` (optionnel) marque cette table comme **active** (utile pour autocomplétion côté UI).
+
+* Le module `utils/sql_lab.py` fournit :
+
+  * une **connexion DuckDB** persistante en session,
+  * l’**enregistrement** (ou ré-enregistrement) des tables exposées,
+  * une exécution **sécurisée** des requêtes (seuls les `SELECT` sont autorisés),
+  * l’**introspection** (liste des tables, `DESCRIBE` friendly).
+
+### Sécurité (garde-fous)
+
+Le SQL Lab **refuse** DDL/DML (ex. `DROP`, `UPDATE`, `CREATE`, `ALTER`, `ATTACH`…), seules les requêtes **SELECT** sont exécutées.
+Les tables exposées sont ré-enregistrées comme **vues DuckDB** à chaque mise à jour.
+
+### Bonnes pratiques de nommage
+
+Pour garder une cartographie claire, Datalyzer nomme souvent les tables exposées ainsi :
+
+* `nom_fichier__missing_dropped` — après nettoyage NA
+* `nom_fichier__outliers_iqr_<col>` — outliers détectés
+* `nom_fichier__auto_cleaned` — nettoyage auto
+* `nom_fichier__pca_scores_<k>[_std]` — scores PCA
+* `nom_gauche_nom_droite` — jointure
+* `nom_fichier__export_selection` — sélection exportée, etc.
 
 ---
 
@@ -47,30 +96,63 @@ Conçue pour les **data analysts, data scientists et ingénieurs data**, Datalyz
 * Export propre et traçabilité
   ![Export](docs/screenshot_export.png)
 
+* SQL Lab — requête sur résultats intermédiaires
+![SQL Lab](screenshot_sql_lab.png)
+  *(capture suggérée : une requête `SELECT ... FROM pca_scores_3_std LIMIT 20;`)*
+
 ---
 
 ## Installation et lancement en local
 
-1. Installer les dépendances :
+1. Dépendances :
 
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Démarrer l’application :
+2. Lancer l’application :
 
 ```bash
 streamlit run app.py
 ```
 
-3. Accéder à l’interface depuis votre navigateur :
+3. Ouvrir dans le navigateur :
    [http://localhost:8501](http://localhost:8501)
 
 ---
 
-## Organisation du projet
+## Utiliser le SQL Lab dans vos sections
 
+Dans **toute section** où vous produisez un DataFrame exploitable, exposez-le :
+
+```python
+from utils.sql_bridge import expose_to_sql_lab
+
+# Exemple : après typage
+expose_to_sql_lab("df_typed", df, make_active=True)
+
+# Exemple : scores PCA (avec index pour jointures faciles)
+scores_sql = scores.copy()
+scores_sql.insert(0, "__index__", scores_sql.index)
+expose_to_sql_lab(f"{nom_fichier}__pca_scores_{n_comp}", scores_sql)
 ```
+
+Ensuite, dans l’onglet **SQL Lab**, requêtez librement :
+
+```sql
+-- Exemples
+SELECT * FROM df_typed LIMIT 50;
+
+SELECT s.__index__, s.PC1, s.PC2, d.cible
+FROM myfile__pca_scores_3 AS s
+LEFT JOIN df_typed AS d ON d.index = s.__index__;
+```
+
+> ℹ️ L’interface SQL Lab liste les tables disponibles et autorise **uniquement des SELECT**.
+
+---
+
+## Organisation du projet
 datalyzer/
 ├── app.py                 # Point d’entrée Streamlit
 ├── config.py              # Paramètres globaux (thème, couleurs, constantes)
@@ -90,7 +172,8 @@ datalyzer/
 │   ├── cible.py           # Analyse d’une variable cible numérique
 │   ├── jointures.py       # Fusion et métriques de couverture
 │   ├── multivariee.py     # Analyses multivariées (ACP, clustering)
-│   └── export.py          # Export colonnes + lignes filtrées
+│   ├──  export.py         # Export colonnes + lignes filtrées
+│   └── sql_lab.py         # interface SQL Lab
 │
 ├── utils/                 # Fonctions transverses
 │   ├── eda_utils.py       # Corrélations, Cramér’s V, boxplots
@@ -98,7 +181,9 @@ datalyzer/
 │   ├── log_utils.py       # Journalisation des actions (CSV)
 │   ├── snapshot_utils.py  # Gestion snapshots (sauvegarde atomique)
 │   ├── state_manager.py   # Gestion d’état Streamlit
-│   └── steps.py           # Séquence canonique des étapes EDA
+│   ├── steps.py           # Séquence canonique des étapes EDA
+│   ├── sql_lab.py         # Connexion DuckDB, enregistrement, exécution sécurisée
+│   └── sql_bridge.py      # Helper "expose_to_sql_lab(name, df, make_active=False)"
 │
 ├── data/
 │   ├── snapshots/         # Sauvegardes intermédiaires (.csv[.gz])
@@ -111,33 +196,76 @@ datalyzer/
 ├── requirements.txt       # Dépendances Python
 └── README.md              # Documentation
 ```
+datalyzer/
+├── app.py                 # Point d’entrée Streamlit
+├── config.py              # Paramètres globaux (thème, couleurs, constantes)
+│
+├── assets/
+│   └── style_dark.css
+│
+├── sections/
+│   ├── home.py
+│   ├── fichiers.py
+│   ├── exploration.py
+│   ├── typage.py
+│   ├── suggestions.py
+│   ├── qualite.py
+│   ├── anomalies.py
+│   ├── cat_analysis.py
+│   ├── cible.py
+│   ├── jointures.py
+│   ├── multivariee.py
+│   ├── export.py
+│   └── sql_lab.py 
+│
+├── utils/
+│   ├── eda_utils.py
+│   ├── filters.py
+│   ├── log_utils.py
+│   ├── snapshot_utils.py
+│   ├── state_manager.py
+│   ├── steps.py
+│   ├── sql_lab.py         # Connexion DuckDB, enregistrement, exécution sécurisée
+│   └── sql_bridge.py      # Helper "expose_to_sql_lab(name, df, make_active=False)"
+│
+├── data/
+│   ├── snapshots/
+│   └── exports/
+│
+├── logs/
+│   └── history_log.csv
+│
+├── images/
+├── requirements.txt
+└── README.md
+```
 
 ---
 
 ## Pourquoi utiliser Datalyzer ?
 
 * Disponible en **ligne** : [datalyzer.streamlit.app](https://datalyzer.streamlit.app/)
-* Fonctionne aussi **100 % localement** pour garder vos données confidentielles
-* Une **interface claire et pédagogique** qui rend l’EDA accessible sans écrire de code
-* Une **traçabilité complète** : snapshots et logs pour rejouer vos étapes
-* Un **outil modulaire** pensé pour évoluer (ajout facile de nouveaux blocs analytiques)
-* Un design **sobre et zen**, pensé pour travailler efficacement
+* Fonctionne aussi **100 % localement**
+* UI **claire et pédagogique**
+* **Traçabilité** : snapshots + logs
+* **Modulaire** : facile d’ajouter de nouveaux blocs analytiques
+* Désormais : **requêtes SQL instantanées** sur vos résultats intermédiaires
 
 ---
 
 ## Cas d’usage concrets
 
-* **Contrôle qualité avant reporting** : vérifier un export CRM/ERP avant intégration BI, détecter doublons ou placeholders.
-* **Préparation pour Machine Learning** : corriger les types, encoder les colonnes, nettoyer le bruit avant entraînement d’un modèle.
-* **Fusion de fichiers hétérogènes** : joignez plusieurs CSV/Excel et évaluez la qualité de la jointure avec des métriques claires.
-* **Audit de données en migration** : calculez un score global de qualité et détectez les anomalies numériques.
-* **Exploration pédagogique** : outil idéal pour enseigner l’EDA grâce à une interface guidée et des messages explicatifs.
+* **Contrôle qualité avant reporting** : vérifier un export CRM/ERP, détecter doublons/placeholders, requêter les résultats par SQL.
+* **Préparation ML** : corriger les types, encoder, nettoyer → exposer les tables d’entraînement/validation au SQL Lab.
+* **Fusion de fichiers** : joignez plusieurs CSV/Excel, mesurez la couverture, **inspectez la fusion** en SQL.
+* **Audit de migration** : score de qualité + anomalies + requêtes ciblées.
+* **Exploration pédagogique** : interface guidée + SQL pour illustrer les jointures/agrégats.
 
 ---
 
 ## Auteur
 
 Projet conçu et développé par **Xavier Rousseau**
-📊 Data Engineer & Analyst — passionné par la qualité des données, la visualisation et l’automatisation
+📊 Data Analyst — passionné par la qualité des données, la visualisation et l’automatisation
 
 ---
