@@ -97,8 +97,7 @@ Pour garder une cartographie claire, Datalyzer nomme souvent les tables exposée
   ![Export](docs/screenshot_export.png)
 
 * SQL Lab — requête sur résultats intermédiaires
-![SQL Lab](screenshot_sql_lab.png)
-  *(capture suggérée : une requête `SELECT ... FROM pca_scores_3_std LIMIT 20;`)*
+  ![SQL Lab](docs/screenshot_sql_lab.png)
 
 ---
 
