@@ -152,6 +152,8 @@ LEFT JOIN df_typed AS d ON d.index = s.__index__;
 ---
 
 ## Organisation du projet
+
+```
 datalyzer/
 ├── app.py                 # Point d’entrée Streamlit
 ├── config.py              # Paramètres globaux (thème, couleurs, constantes)
@@ -195,50 +197,6 @@ datalyzer/
 ├── requirements.txt       # Dépendances Python
 └── README.md              # Documentation
 ```
-datalyzer/
-├── app.py                 # Point d’entrée Streamlit
-├── config.py              # Paramètres globaux (thème, couleurs, constantes)
-│
-├── assets/
-│   └── style_dark.css
-│
-├── sections/
-│   ├── home.py
-│   ├── fichiers.py
-│   ├── exploration.py
-│   ├── typage.py
-│   ├── suggestions.py
-│   ├── qualite.py
-│   ├── anomalies.py
-│   ├── cat_analysis.py
-│   ├── cible.py
-│   ├── jointures.py
-│   ├── multivariee.py
-│   ├── export.py
-│   └── sql_lab.py 
-│
-├── utils/
-│   ├── eda_utils.py
-│   ├── filters.py
-│   ├── log_utils.py
-│   ├── snapshot_utils.py
-│   ├── state_manager.py
-│   ├── steps.py
-│   ├── sql_lab.py         # Connexion DuckDB, enregistrement, exécution sécurisée
-│   └── sql_bridge.py      # Helper "expose_to_sql_lab(name, df, make_active=False)"
-│
-├── data/
-│   ├── snapshots/
-│   └── exports/
-│
-├── logs/
-│   └── history_log.csv
-│
-├── images/
-├── requirements.txt
-└── README.md
-```
-
 ---
 
 ## Pourquoi utiliser Datalyzer ?
