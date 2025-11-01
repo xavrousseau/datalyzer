@@ -1,7 +1,3 @@
-Parfait — voici un **README mis à jour** avec l’intégration **SQL Lab (DuckDB en mémoire)**, prêt à remplacer ton fichier actuel.
-
----
-
 # 🌸 Datalyzer – Analyse exploratoire, nettoyage… et SQL Lab (DuckDB)
 
 Datalyzer est une application interactive Streamlit qui transforme vos données tabulaires (CSV, Excel, Parquet) en une expérience d’exploration fluide, pédagogique et esthétique.
